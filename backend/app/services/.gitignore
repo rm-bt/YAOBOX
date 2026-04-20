@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual env
+.venv/
+
+# Env variables
+.env
+
+# Uploads (VERY IMPORTANT)
+uploads/
+
+# VSCode
+.vscode/
+
+# OS
+.DS_Store
