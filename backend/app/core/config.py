@@ -16,5 +16,8 @@ class Settings:
         os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
     )
 
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "").strip()
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
+
 
 settings = Settings()
