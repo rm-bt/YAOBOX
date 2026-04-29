@@ -1,17 +1,41 @@
+import os
 import re
+from dataclasses import dataclass
+
 import cv2
 import pytesseract
 from PIL import Image
-from deep_translator import GoogleTranslator
 
-# Windows local path
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+from app.core.config import settings
 
-# Optional barcode support
+# Optional barcode support. The pyzbar Python package also requires the native zbar library.
 try:
     from pyzbar.pyzbar import decode as pyzbar_decode
 except Exception:
     pyzbar_decode = None
+
+
+@dataclass(frozen=True)
+class OCRResult:
+    raw_text: str
+    cleaned_text: str
+    confidence: float | None
+    status: str
+    error: str | None = None
+
+
+def configure_tesseract() -> None:
+    """Configure Tesseract from environment instead of hardcoding one Windows path."""
+    if settings.TESSERACT_CMD:
+        pytesseract.pytesseract.tesseract_cmd = settings.TESSERACT_CMD
+        return
+
+    common_windows_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+    if os.name == "nt" and os.path.exists(common_windows_path):
+        pytesseract.pytesseract.tesseract_cmd = common_windows_path
+
+
+configure_tesseract()
 
 
 def extract_barcode(image_path: str) -> str | None:
@@ -48,7 +72,7 @@ def crop_center_region(image):
 def preprocess_image(image_path: str) -> Image.Image:
     image = cv2.imread(image_path)
     if image is None:
-        raise ValueError("Could not read image")
+        raise ValueError("Could not read uploaded image. Use a valid JPG, PNG, WEBP, or BMP file.")
 
     cropped = crop_center_region(image)
     gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
@@ -59,17 +83,101 @@ def preprocess_image(image_path: str) -> Image.Image:
     return Image.fromarray(thresh)
 
 
-def extract_text(image_path: str) -> str:
+def _read_confidence(processed_image: Image.Image) -> float | None:
     try:
-        processed_image = preprocess_image(image_path)
+        data = pytesseract.image_to_data(
+            processed_image,
+            lang="chi_sim",
+            config="--oem 3 --psm 6",
+            output_type=pytesseract.Output.DICT,
+        )
+    except Exception:
+        return None
+
+    values: list[float] = []
+    for raw_conf in data.get("conf", []):
+        try:
+            value = float(raw_conf)
+        except (TypeError, ValueError):
+            continue
+        if value >= 0:
+            values.append(value)
+
+    if not values:
+        return None
+
+    return round(sum(values) / len(values) / 100, 3)
+
+
+def extract_text(image_path: str) -> str:
+    processed_image = preprocess_image(image_path)
+
+    try:
         text = pytesseract.image_to_string(
             processed_image,
             lang="chi_sim",
-            config="--oem 3 --psm 6"
+            config="--oem 3 --psm 6",
         )
-        return text.strip()
-    except Exception:
-        return ""
+    except pytesseract.TesseractNotFoundError as exc:
+        raise RuntimeError(
+            "Tesseract executable was not found. Install Tesseract OCR or set TESSERACT_CMD in backend/.env."
+        ) from exc
+    except pytesseract.TesseractError as exc:
+        raise RuntimeError(
+            "Tesseract OCR failed. Check that the Chinese language pack chi_sim is installed."
+        ) from exc
+
+    return text.strip()
+
+
+def extract_text_with_confidence(image_path: str) -> OCRResult:
+    try:
+        processed_image = preprocess_image(image_path)
+        raw_text = pytesseract.image_to_string(
+            processed_image,
+            lang="chi_sim",
+            config="--oem 3 --psm 6",
+        ).strip()
+        cleaned_text = clean_text(raw_text)
+        confidence = _read_confidence(processed_image)
+
+        if cleaned_text:
+            status = "succeeded"
+        elif raw_text:
+            status = "partial"
+        else:
+            status = "empty"
+
+        return OCRResult(
+            raw_text=raw_text,
+            cleaned_text=cleaned_text,
+            confidence=confidence,
+            status=status,
+        )
+    except pytesseract.TesseractNotFoundError:
+        return OCRResult(
+            raw_text="",
+            cleaned_text="",
+            confidence=None,
+            status="failed",
+            error="Tesseract executable was not found. Install Tesseract OCR or set TESSERACT_CMD in backend/.env.",
+        )
+    except pytesseract.TesseractError:
+        return OCRResult(
+            raw_text="",
+            cleaned_text="",
+            confidence=None,
+            status="failed",
+            error="Tesseract OCR failed. Check that the Chinese language pack chi_sim is installed.",
+        )
+    except Exception as exc:
+        return OCRResult(
+            raw_text="",
+            cleaned_text="",
+            confidence=None,
+            status="failed",
+            error=str(exc),
+        )
 
 
 def clean_text(text: str) -> str:

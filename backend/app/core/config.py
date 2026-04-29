@@ -18,6 +18,7 @@ class Settings:
 
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "").strip()
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
+    TESSERACT_CMD: str = os.getenv("TESSERACT_CMD", "").strip()
 
 
 settings = Settings()
