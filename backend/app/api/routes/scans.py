@@ -1,5 +1,4 @@
 import os
-from uuid import uuid4
 
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from sqlalchemy import or_
@@ -13,6 +12,11 @@ from app.models.scan import ScanRecord
 from app.models.user import User
 from app.schemas.scan import ScanCreate, ScanResponse, ScanBarcodeRequest
 from app.services.ai_service import explain_medicine_info, answer_scan_question
+from app.services.upload_validation import (
+    build_upload_path,
+    validate_image_upload_metadata,
+    validate_upload_bytes,
+)
 from app.services.ocr_service import (
     extract_barcode,
     extract_text,
@@ -240,19 +244,14 @@ def upload_scan_image(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="Only image files are allowed")
+    extension = validate_image_upload_metadata(file)
 
     os.makedirs("uploads", exist_ok=True)
-
-    ext = os.path.splitext(file.filename)[1].lower() or ".jpg"
-    unique_name = f"{uuid4().hex}{ext}"
-    save_path = os.path.join("uploads", unique_name)
+    _, save_path = build_upload_path(extension)
 
     try:
         file_bytes = file.file.read()
-        if not file_bytes:
-            raise HTTPException(status_code=400, detail="Uploaded file is empty")
+        validate_upload_bytes(file_bytes)
 
         with open(save_path, "wb") as buffer:
             buffer.write(file_bytes)
@@ -422,19 +421,14 @@ def upload_prescription(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="Only image files are allowed")
+    extension = validate_image_upload_metadata(file)
 
     os.makedirs("uploads", exist_ok=True)
-
-    ext = os.path.splitext(file.filename)[1].lower() or ".jpg"
-    filename = f"{uuid4().hex}{ext}"
-    save_path = os.path.join("uploads", filename)
+    _, save_path = build_upload_path(extension)
 
     try:
         file_bytes = file.file.read()
-        if not file_bytes:
-            raise HTTPException(status_code=400, detail="Empty file")
+        validate_upload_bytes(file_bytes)
 
         with open(save_path, "wb") as f:
             f.write(file_bytes)
