@@ -5,3 +5,25 @@ __pycache__/
 .vscode/
 backend/uploads/
 uploads/
+# Local environment files
+.env
+*.env
+backend/.env
+
+# Python virtual environments
+.venv/
+venv/
+backend/.venv/
+
+# Node dependencies
+node_modules/
+frontend/node_modules/
+
+# Frontend build output
+dist/
+frontend/dist/
+
+# Python cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
