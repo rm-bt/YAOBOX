@@ -70,55 +70,15 @@ function firstNonEmptyString(...values: unknown[]): string {
 }
 
 function getStoredToken(): string | null {
-  const directKeys = [
-    "access_token",
-    "token",
-    "auth_token",
-    "yaobox_token",
-    "yaobox_access_token",
-  ];
+  const token = window.localStorage.getItem("yaobox_access_token");
+  if (!token) return null;
 
-  for (const key of directKeys) {
-    const value = window.localStorage.getItem(key);
-    if (value) return value;
+  const cleaned = token.trim();
+  if (!cleaned || cleaned === "undefined" || cleaned === "null") {
+    return null;
   }
 
-  const jsonKeys = ["session", "auth", "auth-storage", "yaobox-auth"];
-
-  for (const key of jsonKeys) {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) continue;
-
-    try {
-      const parsed = JSON.parse(raw) as Record<string, unknown>;
-      const candidates = [
-        parsed.access_token,
-        parsed.token,
-        (parsed.session as Record<string, unknown> | undefined)?.access_token,
-        (parsed.session as Record<string, unknown> | undefined)?.token,
-        (parsed.state as Record<string, unknown> | undefined)?.access_token,
-        (parsed.state as Record<string, unknown> | undefined)?.token,
-        (
-          (parsed.state as Record<string, unknown> | undefined)
-            ?.session as Record<string, unknown> | undefined
-        )?.access_token,
-        (
-          (parsed.state as Record<string, unknown> | undefined)
-            ?.session as Record<string, unknown> | undefined
-        )?.token,
-      ];
-
-      const found = candidates.find(
-        (value): value is string => typeof value === "string" && value.length > 0
-      );
-
-      if (found) return found;
-    } catch {
-      // ignore malformed storage
-    }
-  }
-
-  return null;
+  return cleaned;
 }
 
 async function postWithFallback(
