@@ -58,30 +58,41 @@ def safe_explanation(
         )
 
 
+def translate_catalog_field(value: str | None) -> str:
+    if not value:
+        return "Not available"
+    return value.strip()
+
+
 def build_catalog_explanation(
     medicine: Medicine,
     raw_text: str | None = None,
 ) -> str:
+    medicine_name = medicine.canonical_name_en or medicine.canonical_name_zh or "Unknown medicine"
+    manufacturer_text = medicine.manufacturer_en or medicine.manufacturer or "Not available"
+    usage_text = medicine.usage_en or medicine.usage or "Not available"
+    dosage_text = medicine.dosage or "Not available"
+    warning_text = medicine.warnings_en or medicine.warnings or "Not available"
+
+    trust_text = (
+        "Matched against a verified catalog record."
+        if medicine.is_verified
+        else "Matched against a catalog record that is not yet verified."
+    )
+
     lines = [
-        f"Medicine: {medicine.canonical_name_en or medicine.canonical_name_zh or 'Unknown medicine'}",
-        f"Manufacturer: {medicine.manufacturer or 'Not available'}",
-        f"Usage: {medicine.usage or 'Not available'}",
-        f"Dosage: {medicine.dosage or 'Not available'}",
+        f"Medicine: {medicine_name}",
+        f"Manufacturer: {manufacturer_text}",
+        f"Usage: {usage_text}",
+        f"Dosage: {dosage_text}",
+        f"Warnings: {warning_text}",
+        f"Trust: {trust_text}",
     ]
 
-    if medicine.warnings:
-        lines.append(f"Warnings: {medicine.warnings}")
-
-    if medicine.is_verified:
-        lines.append("Trust: Matched against a verified catalog record.")
-    else:
-        lines.append("Trust: Matched against a catalog record that is not yet verified.")
-
     if raw_text:
-        lines.append("Source note: OCR text was also captured for reference.")
+        lines.append("Source note: OCR text was also captured separately for reference.")
 
     return "\n".join(lines)
-
 
 def extract_warning_text(raw_text: str | None, catalog_warning: str | None = None) -> str | None:
     if catalog_warning:
@@ -101,6 +112,21 @@ def extract_warning_text(raw_text: str | None, catalog_warning: str | None = Non
     return None
 
 
+def normalize_lookup_key(value: str | None) -> str:
+    if not value:
+        return ""
+    return (
+        value.replace(" ", "")
+        .replace("　", "")
+        .replace("-", "")
+        .replace("_", "")
+        .replace("（", "(")
+        .replace("）", ")")
+        .strip()
+        .lower()
+    )
+
+
 def find_catalog_match(
     db: Session,
     barcode: str | None,
@@ -109,33 +135,53 @@ def find_catalog_match(
 ) -> Medicine | None:
     clean_barcode = normalize_text(barcode)
     clean_name = normalize_text(extracted_name)
+    normalized_name = normalize_lookup_key(clean_name)
 
     if clean_barcode:
         medicine = db.query(Medicine).filter(Medicine.barcode == clean_barcode).first()
         if medicine:
             return medicine
 
-    candidate_text = clean_name
-    if not candidate_text and raw_text:
-        lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
-        candidate_text = lines[0] if lines else None
+    medicines = (
+        db.query(Medicine)
+        .order_by(Medicine.is_verified.desc(), Medicine.id.desc())
+        .all()
+    )
 
-    if candidate_text:
-        like_value = f"%{candidate_text}%"
-        medicine = (
-            db.query(Medicine)
-            .filter(
-                or_(
-                    Medicine.canonical_name_zh.ilike(like_value),
-                    Medicine.canonical_name_en.ilike(like_value),
-                    Medicine.aliases.ilike(like_value),
-                )
-            )
-            .order_by(Medicine.is_verified.desc(), Medicine.id.desc())
-            .first()
-        )
-        if medicine:
-            return medicine
+    candidates: list[str] = []
+
+    if clean_name:
+        candidates.append(clean_name)
+
+    if normalized_name and normalized_name != clean_name:
+        candidates.append(normalized_name)
+
+    if raw_text:
+        lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+        candidates.extend(lines[:8])
+
+    normalized_candidates = []
+    for value in candidates:
+        normalized = normalize_lookup_key(value)
+        if normalized:
+            normalized_candidates.append(normalized)
+
+    for medicine in medicines:
+        keys = [
+            medicine.canonical_name_zh or "",
+            medicine.canonical_name_en or "",
+            medicine.aliases or "",
+            medicine.barcode or "",
+        ]
+
+        normalized_keys = [normalize_lookup_key(key) for key in keys if key]
+
+        for candidate in normalized_candidates:
+            for key in normalized_keys:
+                if not key:
+                    continue
+                if candidate == key or candidate in key or key in candidate:
+                    return medicine
 
     return None
 

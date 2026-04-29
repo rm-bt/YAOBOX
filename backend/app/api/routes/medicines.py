@@ -25,16 +25,19 @@ def create_medicine(
     current_user: User = Depends(get_current_user),
 ):
     medicine = Medicine(
-        canonical_name_en=normalize_text(data.canonical_name_en),
-        canonical_name_zh=normalize_text(data.canonical_name_zh),
-        barcode=normalize_text(data.barcode),
-        manufacturer=normalize_text(data.manufacturer),
-        usage=normalize_text(data.usage),
-        dosage=normalize_text(data.dosage),
-        warnings=normalize_text(data.warnings),
-        aliases=normalize_text(data.aliases),
-        is_verified=data.is_verified,
-    )
+    canonical_name_en=normalize_text(data.canonical_name_en),
+    canonical_name_zh=normalize_text(data.canonical_name_zh),
+    barcode=normalize_text(data.barcode),
+    manufacturer=normalize_text(data.manufacturer),
+    manufacturer_en=normalize_text(data.manufacturer_en),
+    usage=normalize_text(data.usage),
+    usage_en=normalize_text(data.usage_en),
+    dosage=normalize_text(data.dosage),
+    warnings=normalize_text(data.warnings),
+    warnings_en=normalize_text(data.warnings_en),
+    aliases=normalize_text(data.aliases),
+    is_verified=data.is_verified,
+)
 
     db.add(medicine)
     db.commit()
