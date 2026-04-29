@@ -12,6 +12,8 @@ class ScanRecord(Base):
     image_path = Column(String(500), nullable=True)
     barcode = Column(String(128), nullable=True, index=True)
 
+    medicine_id = Column(Integer, ForeignKey("medicines.id"), nullable=True)
+
     medicine_name = Column(String(255), nullable=True)
     raw_ocr_text = Column(Text, nullable=True)
     translated_text = Column(Text, nullable=True)
@@ -19,5 +21,6 @@ class ScanRecord(Base):
     manufacturer = Column(String(255), nullable=True)
     usage = Column(Text, nullable=True)
     dosage = Column(String(255), nullable=True)
+    warnings = Column(Text, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, EmailStr
 
 
@@ -11,6 +13,17 @@ class UserResponse(BaseModel):
     id: int
     email: str
     full_name: str | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class UserMeResponse(BaseModel):
+    id: int
+    email: str
+    full_name: str | None = None
+    language_pref: str | None = None
+    created_at: datetime | None = None
 
     class Config:
         from_attributes = True
