@@ -1,0 +1,92 @@
+@import url("https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700;800&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Lexend", ui-sans-serif, system-ui, sans-serif;
+
+  --color-brand-primary: #556347;
+  --color-brand-light: #d9e9c6;
+  --color-brand-surface: #f8faf6;
+  --color-brand-ink: #191c1a;
+  --color-brand-muted: #454840;
+  --color-brand-secondary: #635d5a;
+
+  --color-surface-bright: #f8faf6;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f2f4f0;
+  --color-surface-container: #eceeeb;
+  --color-surface-container-high: #e7e9e5;
+
+  --color-on-surface: #191c1a;
+  --color-on-surface-variant: #454840;
+
+  --color-outline: #75786f;
+  --color-outline-variant: #c5c8bd;
+
+  --color-yaobox-primary: #556347;
+  --color-yaobox-primary-container: #d9e9c6;
+  --color-yaobox-on-primary-container: #5b694e;
+
+  --color-yaobox-secondary: #635d5a;
+  --color-yaobox-tertiary: #b72119;
+  --color-yaobox-tertiary-container: #ffdcd7;
+
+  --radius-xl: 2rem;
+  --radius-2xl: 3rem;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+    margin: 0;
+  }
+
+  body {
+    font-family: "Lexend", ui-sans-serif, system-ui, sans-serif;
+    background: #f8faf6;
+    color: #191c1a;
+  }
+
+  ::selection {
+    background: #d9e9c6;
+    color: #5b694e;
+  }
+
+  a {
+    text-decoration: none;
+    color: inherit;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(85, 99, 71, 0.1);
+}
+
+.pill-button {
+  padding: 0.625rem 1.5rem;
+  border-radius: 9999px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.gradient-text {
+  background: linear-gradient(to bottom right, #556347, #635d5a);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.brand-glow {
+  box-shadow: 0 20px 50px -12px rgba(85, 99, 71, 0.15);
+}
