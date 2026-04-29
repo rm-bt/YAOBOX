@@ -25,6 +25,9 @@ type NormalizedResult = {
   medicineName: string;
   medicineNameZh: string;
   matchStatus: string;
+  ocrStatus: string;
+  aiStatus: string;
+  trustNotes: string;
   barcode: string;
   dosage: string;
   usage: string;
@@ -91,6 +94,7 @@ function humanizeSourceType(value: string): string {
   if (normalized === "image_upload") return "Image Upload";
   if (normalized === "manual_entry") return "Manual Entry";
   if (normalized === "prescription") return "Prescription";
+  if (normalized === "prescription_upload") return "Prescription Upload";
   if (normalized === "report") return "Report";
 
   return value.replace(/_/g, " ") || "Scan";
@@ -99,11 +103,30 @@ function humanizeSourceType(value: string): string {
 function humanizeMatchStatus(value: string): string {
   const normalized = value.trim().toLowerCase();
 
-  if (!normalized || normalized === "unknown") return "Detected";
+  if (!normalized || normalized === "unknown") return "Unknown";
   if (normalized === "identified") return "Identified";
-  if (normalized === "verified") return "Verified";
+  if (normalized === "verified") return "Verified catalog";
+  if (normalized === "catalog_unverified") return "Catalog match, unverified";
   if (normalized === "probable") return "Probable";
   if (normalized === "saved") return "Saved";
+  if (normalized === "ocr_extracted") return "OCR extracted";
+  if (normalized === "barcode_unknown") return "Barcode not matched";
+  if (normalized === "manual") return "Manual entry";
+
+  return value.replace(/_/g, " ");
+}
+
+function humanizeStatus(value: string): string {
+  const normalized = value.trim().toLowerCase();
+
+  if (!normalized) return "Not available";
+  if (normalized === "succeeded") return "Succeeded";
+  if (normalized === "partial") return "Partial";
+  if (normalized === "empty") return "No text found";
+  if (normalized === "failed") return "Failed";
+  if (normalized === "fallback") return "Fallback";
+  if (normalized === "skipped") return "Skipped";
+  if (normalized === "not_applicable") return "Not applicable";
 
   return value.replace(/_/g, " ");
 }
@@ -264,8 +287,18 @@ function normalizeResult(input: unknown): NormalizedResult | null {
         raw.matchStatus,
         raw.match_status,
         medicine.matchStatus
-      ) || "detected"
+      ) || "unknown"
     ),
+    ocrStatus: humanizeStatus(
+      firstNonEmptyString(raw.ocrStatus, raw.ocr_status) ||
+        (sourceType === "barcode" ? "not_applicable" : "not available")
+    ),
+    aiStatus: humanizeStatus(
+      firstNonEmptyString(raw.aiStatus, raw.ai_status) || "not available"
+    ),
+    trustNotes:
+      firstNonEmptyString(raw.trustNotes, raw.trust_notes) ||
+      "Trust metadata was not returned by the backend for this result.",
     barcode: barcode || "Not available",
     dosage:
       firstNonEmptyString(
@@ -350,6 +383,12 @@ export default function ScanResultPage() {
     source_type?: string;
     matchStatus?: string;
     match_status?: string;
+    ocrStatus?: string;
+    ocr_status?: string;
+    aiStatus?: string;
+    ai_status?: string;
+    trustNotes?: string;
+    trust_notes?: string;
     barcode?: string;
     imagePreview?: string | null;
     image_url?: string | null;
@@ -415,6 +454,8 @@ export default function ScanResultPage() {
         <div className="flex flex-wrap gap-2">
           <MetaChip label="source" value={result.sourceLabel} />
           <MetaChip label="match" value={result.matchStatus} />
+          <MetaChip label="OCR" value={result.ocrStatus} />
+          <MetaChip label="AI" value={result.aiStatus} />
           {result.confidenceLabel ? (
             <MetaChip label="confidence" value={result.confidenceLabel} />
           ) : null}
@@ -475,6 +516,14 @@ export default function ScanResultPage() {
                 <span className="font-bold text-slate-900">Source:</span>{" "}
                 {result.sourceLabel}
               </div>
+              <div className="rounded-[20px] bg-slate-50 px-4 py-3">
+                <span className="font-bold text-slate-900">OCR status:</span>{" "}
+                {result.ocrStatus}
+              </div>
+              <div className="rounded-[20px] bg-slate-50 px-4 py-3">
+                <span className="font-bold text-slate-900">AI status:</span>{" "}
+                {result.aiStatus}
+              </div>
               <div className="rounded-[20px] bg-slate-50 px-4 py-3 sm:col-span-2">
                 <span className="font-bold text-slate-900">Scan time:</span>{" "}
                 {result.createdAtLabel}
@@ -531,6 +580,12 @@ export default function ScanResultPage() {
               </div>
             ) : null}
           </div>
+
+          <InfoCard title="Trust and source notes">
+            <p className="whitespace-pre-wrap text-sm text-slate-700">
+              {result.trustNotes}
+            </p>
+          </InfoCard>
 
           <div className="rounded-[32px] border border-slate-100 bg-white p-6 shadow-sm">
             <p className="text-xs text-slate-500 font-bold uppercase tracking-[0.12em] mb-4">
