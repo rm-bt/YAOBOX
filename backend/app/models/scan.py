@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Float
 from sqlalchemy.sql import func
 from app.core.database import Base
 
@@ -22,5 +22,14 @@ class ScanRecord(Base):
     usage = Column(Text, nullable=True)
     dosage = Column(String(255), nullable=True)
     warnings = Column(Text, nullable=True)
+
+    # Trust/provenance fields for thesis-safe scan results.
+    source_type = Column(String(64), nullable=True)
+    match_status = Column(String(64), nullable=True)
+    ocr_status = Column(String(64), nullable=True)
+    ai_status = Column(String(64), nullable=True)
+    ocr_confidence = Column(Float, nullable=True)
+    ai_confidence = Column(String(64), nullable=True)
+    trust_notes = Column(Text, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())

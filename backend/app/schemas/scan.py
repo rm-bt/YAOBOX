@@ -12,6 +12,13 @@ class ScanCreate(BaseModel):
     usage: str | None = None
     dosage: str | None = None
     warnings: str | None = None
+    source_type: str | None = None
+    match_status: str | None = None
+    ocr_status: str | None = None
+    ai_status: str | None = None
+    ocr_confidence: float | None = None
+    ai_confidence: str | None = None
+    trust_notes: str | None = None
 
 
 class ScanBarcodeRequest(BaseModel):
@@ -31,6 +38,13 @@ class ScanResponse(BaseModel):
     usage: str | None = None
     dosage: str | None = None
     warnings: str | None = None
+    source_type: str | None = None
+    match_status: str | None = None
+    ocr_status: str | None = None
+    ai_status: str | None = None
+    ocr_confidence: float | None = None
+    ai_confidence: str | None = None
+    trust_notes: str | None = None
     created_at: datetime
 
     class Config:

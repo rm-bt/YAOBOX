@@ -20,6 +20,7 @@ from app.services.upload_validation import (
 from app.services.ocr_service import (
     extract_barcode,
     extract_text,
+    extract_text_with_confidence,
     clean_text,
     extract_medicine_name,
     extract_manufacturer,
@@ -66,6 +67,49 @@ def translate_catalog_field(value: str | None) -> str:
     if not value:
         return "Not available"
     return value.strip()
+
+
+def get_match_status(medicine: Medicine | None, fallback: str = "unknown") -> str:
+    if not medicine:
+        return fallback
+    return "verified" if medicine.is_verified else "catalog_unverified"
+
+
+def get_ai_status(value: str | None) -> str:
+    if not value:
+        return "skipped"
+    lowered = value.lower()
+    if "ai service is temporarily unavailable" in lowered:
+        return "fallback"
+    return "succeeded"
+
+
+def build_trust_notes(
+    source_type: str,
+    match_status: str,
+    ocr_status: str,
+    ai_status: str,
+    ocr_error: str | None = None,
+) -> str:
+    notes = [
+        f"Source type: {source_type}.",
+        f"Medicine match: {match_status}.",
+        f"OCR status: {ocr_status}.",
+        f"AI explanation status: {ai_status}.",
+    ]
+
+    if ocr_error:
+        notes.append(f"OCR error: {ocr_error}")
+
+    if match_status == "verified":
+        notes.append("Verified catalog data should be trusted more than OCR or AI-generated text.")
+    elif match_status == "catalog_unverified":
+        notes.append("Catalog data was found but is not marked verified.")
+    else:
+        notes.append("No verified medicine catalog match was found; review OCR and AI text carefully.")
+
+    return " ".join(notes)
+
 
 
 def build_catalog_explanation(
@@ -197,6 +241,30 @@ def create_scan(
     current_user: User = Depends(get_current_user),
 ):
     try:
+        source_type = "image_upload"
+        match_status = get_match_status(
+            catalog_match,
+            fallback="ocr_extracted" if cleaned_text else "unknown",
+        )
+        ai_status = get_ai_status(translated_result)
+        trust_notes = build_trust_notes(
+            source_type=source_type,
+            match_status=match_status,
+            ocr_status=ocr_result.status,
+            ai_status=ai_status,
+            ocr_error=ocr_result.error,
+        )
+
+        source_type = "barcode"
+        match_status = get_match_status(catalog_match, fallback="barcode_unknown")
+        ai_status = get_ai_status(translated_result)
+        trust_notes = build_trust_notes(
+            source_type=source_type,
+            match_status=match_status,
+            ocr_status="not_applicable",
+            ai_status=ai_status,
+        )
+
         new_scan = ScanRecord(
             user_id=current_user.id,
             image_path=None,
@@ -209,6 +277,18 @@ def create_scan(
             usage=scan.usage,
             dosage=scan.dosage,
             warnings=getattr(scan, "warnings", None),
+            source_type=getattr(scan, "source_type", None) or "manual_entry",
+            match_status=getattr(scan, "match_status", None) or "manual",
+            ocr_status=getattr(scan, "ocr_status", None) or "not_applicable",
+            ai_status=getattr(scan, "ai_status", None) or get_ai_status(scan.translated_text),
+            ocr_confidence=getattr(scan, "ocr_confidence", None),
+            ai_confidence=getattr(scan, "ai_confidence", None),
+            trust_notes=getattr(scan, "trust_notes", None) or build_trust_notes(
+                source_type="manual_entry",
+                match_status="manual",
+                ocr_status="not_applicable",
+                ai_status=get_ai_status(scan.translated_text),
+            ),
         )
 
         db.add(new_scan)
@@ -257,8 +337,9 @@ def upload_scan_image(
             buffer.write(file_bytes)
 
         barcode = extract_barcode(save_path)
-        raw_text = extract_text(save_path)
-        cleaned_text = clean_text(raw_text)
+        ocr_result = extract_text_with_confidence(save_path)
+        raw_text = ocr_result.raw_text
+        cleaned_text = ocr_result.cleaned_text
 
         extracted_name = extract_medicine_name(cleaned_text)
         extracted_manufacturer = extract_manufacturer(cleaned_text)
@@ -314,6 +395,13 @@ def upload_scan_image(
             usage=usage,
             dosage=dosage,
             warnings=warnings,
+            source_type=source_type,
+            match_status=match_status,
+            ocr_status=ocr_result.status,
+            ai_status=ai_status,
+            ocr_confidence=ocr_result.confidence,
+            ai_confidence="medium" if ai_status == "succeeded" else None,
+            trust_notes=trust_notes,
         )
 
         db.add(new_scan)
@@ -400,6 +488,13 @@ def scan_by_barcode(
             usage=usage,
             dosage=dosage,
             warnings=warnings,
+            source_type=source_type,
+            match_status=match_status,
+            ocr_status="not_applicable",
+            ai_status=ai_status,
+            ocr_confidence=None,
+            ai_confidence="medium" if ai_status == "succeeded" else None,
+            trust_notes=trust_notes,
         )
 
         db.add(new_scan)
@@ -433,8 +528,9 @@ def upload_prescription(
         with open(save_path, "wb") as f:
             f.write(file_bytes)
 
-        raw_text = extract_text(save_path)
-        cleaned_text = clean_text(raw_text)
+        ocr_result = extract_text_with_confidence(save_path)
+        raw_text = ocr_result.raw_text
+        cleaned_text = ocr_result.cleaned_text
 
         translated_result = safe_explanation(
             medicine_name=None,
@@ -442,6 +538,17 @@ def upload_prescription(
             usage=None,
             dosage=None,
             raw_text=cleaned_text,
+        )
+
+        source_type = "prescription_upload"
+        match_status = "ocr_extracted" if cleaned_text else "unknown"
+        ai_status = get_ai_status(translated_result)
+        trust_notes = build_trust_notes(
+            source_type=source_type,
+            match_status=match_status,
+            ocr_status=ocr_result.status,
+            ai_status=ai_status,
+            ocr_error=ocr_result.error,
         )
 
         new_record = ScanRecord(
@@ -456,6 +563,13 @@ def upload_prescription(
             usage=None,
             dosage=None,
             warnings=extract_warning_text(cleaned_text),
+            source_type=source_type,
+            match_status=match_status,
+            ocr_status=ocr_result.status,
+            ai_status=ai_status,
+            ocr_confidence=ocr_result.confidence,
+            ai_confidence="medium" if ai_status == "succeeded" else None,
+            trust_notes=trust_notes,
         )
 
         db.add(new_record)

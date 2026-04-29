@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
+from sqlalchemy import inspect, text
 
 from .api.routes import auth, scans, reminders, users, history
 from .api.routes.medicines import router as medicines_router
@@ -11,7 +12,43 @@ from .models.scan import ScanRecord
 from .models.reminder import Reminder
 from .models.medicine import Medicine
 
+
+def ensure_scan_trust_columns() -> None:
+    """Temporary compatibility helper until Alembic migrations are added."""
+    required_columns = {
+        "source_type": "VARCHAR(64)",
+        "match_status": "VARCHAR(64)",
+        "ocr_status": "VARCHAR(64)",
+        "ai_status": "VARCHAR(64)",
+        "ocr_confidence": "FLOAT",
+        "ai_confidence": "VARCHAR(64)",
+        "trust_notes": "TEXT",
+    }
+
+    inspector = inspect(engine)
+    existing_columns = {
+        column["name"]
+        for column in inspector.get_columns("scan_records")
+    }
+
+    missing_columns = [
+        (name, column_type)
+        for name, column_type in required_columns.items()
+        if name not in existing_columns
+    ]
+
+    if not missing_columns:
+        return
+
+    with engine.begin() as connection:
+        for name, column_type in missing_columns:
+            connection.execute(
+                text(f"ALTER TABLE scan_records ADD COLUMN {name} {column_type}")
+            )
+
+
 Base.metadata.create_all(bind=engine)
+ensure_scan_trust_columns()
 os.makedirs("uploads", exist_ok=True)
 
 app = FastAPI(title="Yaobox API", version="0.1.0")
