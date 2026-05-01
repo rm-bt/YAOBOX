@@ -202,11 +202,12 @@ export default function RegisterPage() {
             </div>
 
             {registerMutation.isError ? (
-              <div className="rounded-2xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700 leading-relaxed">
-                Registration failed. The email may already exist, the backend may
-                be down, or the submitted data was rejected.
-              </div>
-            ) : null}
+  <div className="rounded-2xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700 leading-relaxed">
+    {registerMutation.error instanceof Error
+      ? registerMutation.error.message
+      : "Registration failed. Check backend connection and submitted data."}
+  </div>
+) : null}
 
             {registerMutation.isSuccess ? (
               <div className="rounded-2xl bg-emerald-50 border border-emerald-100 px-4 py-3 text-sm text-emerald-700 leading-relaxed flex items-start gap-2">
