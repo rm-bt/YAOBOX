@@ -1,20 +1,26 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-import os
 from sqlalchemy import inspect, text
 
-from .api.routes import auth, scans, reminders, users, history
-from .api.routes.medicines import router as medicines_router
-from .core.database import Base, engine
-from .models.user import User
-from .models.scan import ScanRecord
-from .models.reminder import Reminder
-from .models.medicine import Medicine
+from app.api.routes import auth, history, reminders, scans, users
+from app.api.routes.medicines import router as medicines_router
+from app.core.database import Base, engine
+from app.models.medicine import Medicine
+from app.models.reminder import Reminder
+from app.models.scan import ScanRecord
+from app.models.user import User
 
 
 def ensure_scan_trust_columns() -> None:
-    """Temporary compatibility helper until Alembic migrations are added."""
+    """
+    Temporary database compatibility helper.
+
+    This keeps the thesis MVP working without forcing Alembic migration setup right now.
+    Later, this should be replaced by real Alembic migrations.
+    """
     required_columns = {
         "source_type": "VARCHAR(64)",
         "match_status": "VARCHAR(64)",
@@ -49,6 +55,7 @@ def ensure_scan_trust_columns() -> None:
 
 Base.metadata.create_all(bind=engine)
 ensure_scan_trust_columns()
+
 os.makedirs("uploads", exist_ok=True)
 
 app = FastAPI(title="Yaobox API", version="0.1.0")

@@ -1,31 +1,29 @@
 import os
 
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
-from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from app.api.routes.auth import get_current_user
 from app.core.database import get_db
 from app.models.medicine import Medicine
 from app.models.scan import ScanRecord
 from app.models.user import User
-from app.schemas.scan import ScanCreate, ScanResponse, ScanBarcodeRequest
-from app.services.ai_service import explain_medicine_info, answer_scan_question
+from app.schemas.scan import ScanBarcodeRequest, ScanCreate, ScanResponse
+from app.services.ai_service import answer_scan_question, explain_medicine_info
+from app.services.ocr_service import (
+    clean_text,
+    extract_barcode,
+    extract_dosage,
+    extract_manufacturer,
+    extract_medicine_name,
+    extract_text_with_confidence,
+    extract_usage,
+)
 from app.services.upload_validation import (
     build_upload_path,
     validate_image_upload_metadata,
     validate_upload_bytes,
-)
-from app.services.ocr_service import (
-    extract_barcode,
-    extract_text,
-    extract_text_with_confidence,
-    clean_text,
-    extract_medicine_name,
-    extract_manufacturer,
-    extract_usage,
-    extract_dosage,
 )
 
 router = APIRouter()
@@ -59,29 +57,26 @@ def safe_explanation(
             f"Manufacturer: {manufacturer or 'Not available'}\n"
             f"Usage: {usage or 'Not available'}\n"
             f"Dosage: {dosage or 'Not available'}\n"
-            f"Simple Explanation: AI service is temporarily unavailable. This is a limited fallback summary."
+            "Simple Explanation: AI service is temporarily unavailable. "
+            "This is a limited fallback summary."
         )
 
 
-def translate_catalog_field(value: str | None) -> str:
+def get_ai_status(value: str | None) -> str:
     if not value:
-        return "Not available"
-    return value.strip()
+        return "skipped"
+
+    lowered = value.lower()
+    if "ai service is temporarily unavailable" in lowered:
+        return "fallback"
+
+    return "succeeded"
 
 
 def get_match_status(medicine: Medicine | None, fallback: str = "unknown") -> str:
     if not medicine:
         return fallback
     return "verified" if medicine.is_verified else "catalog_unverified"
-
-
-def get_ai_status(value: str | None) -> str:
-    if not value:
-        return "skipped"
-    lowered = value.lower()
-    if "ai service is temporarily unavailable" in lowered:
-        return "fallback"
-    return "succeeded"
 
 
 def build_trust_notes(
@@ -109,7 +104,6 @@ def build_trust_notes(
         notes.append("No verified medicine catalog match was found; review OCR and AI text carefully.")
 
     return " ".join(notes)
-
 
 
 def build_catalog_explanation(
@@ -142,6 +136,7 @@ def build_catalog_explanation(
 
     return "\n".join(lines)
 
+
 def extract_warning_text(raw_text: str | None, catalog_warning: str | None = None) -> str | None:
     if catalog_warning:
         return catalog_warning
@@ -163,6 +158,7 @@ def extract_warning_text(raw_text: str | None, catalog_warning: str | None = Non
 def normalize_lookup_key(value: str | None) -> str:
     if not value:
         return ""
+
     return (
         value.replace(" ", "")
         .replace("　", "")
@@ -234,6 +230,21 @@ def find_catalog_match(
     return None
 
 
+def save_upload_file(file: UploadFile) -> str:
+    extension = validate_image_upload_metadata(file)
+
+    os.makedirs("uploads", exist_ok=True)
+    _, save_path = build_upload_path(extension)
+
+    file_bytes = file.file.read()
+    validate_upload_bytes(file_bytes)
+
+    with open(save_path, "wb") as buffer:
+        buffer.write(file_bytes)
+
+    return save_path
+
+
 @router.post("/", response_model=ScanResponse)
 def create_scan(
     scan: ScanCreate,
@@ -241,29 +252,10 @@ def create_scan(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        source_type = "image_upload"
-        match_status = get_match_status(
-            catalog_match,
-            fallback="ocr_extracted" if cleaned_text else "unknown",
-        )
-        ai_status = get_ai_status(translated_result)
-        trust_notes = build_trust_notes(
-            source_type=source_type,
-            match_status=match_status,
-            ocr_status=ocr_result.status,
-            ai_status=ai_status,
-            ocr_error=ocr_result.error,
-        )
-
-        source_type = "barcode"
-        match_status = get_match_status(catalog_match, fallback="barcode_unknown")
-        ai_status = get_ai_status(translated_result)
-        trust_notes = build_trust_notes(
-            source_type=source_type,
-            match_status=match_status,
-            ocr_status="not_applicable",
-            ai_status=ai_status,
-        )
+        source_type = scan.source_type or "manual_entry"
+        match_status = scan.match_status or "manual"
+        ocr_status = scan.ocr_status or "not_applicable"
+        ai_status = scan.ai_status or get_ai_status(scan.translated_text)
 
         new_scan = ScanRecord(
             user_id=current_user.id,
@@ -277,17 +269,18 @@ def create_scan(
             usage=scan.usage,
             dosage=scan.dosage,
             warnings=getattr(scan, "warnings", None),
-            source_type=getattr(scan, "source_type", None) or "manual_entry",
-            match_status=getattr(scan, "match_status", None) or "manual",
-            ocr_status=getattr(scan, "ocr_status", None) or "not_applicable",
-            ai_status=getattr(scan, "ai_status", None) or get_ai_status(scan.translated_text),
-            ocr_confidence=getattr(scan, "ocr_confidence", None),
-            ai_confidence=getattr(scan, "ai_confidence", None),
-            trust_notes=getattr(scan, "trust_notes", None) or build_trust_notes(
-                source_type="manual_entry",
-                match_status="manual",
-                ocr_status="not_applicable",
-                ai_status=get_ai_status(scan.translated_text),
+            source_type=source_type,
+            match_status=match_status,
+            ocr_status=ocr_status,
+            ai_status=ai_status,
+            ocr_confidence=scan.ocr_confidence,
+            ai_confidence=scan.ai_confidence,
+            trust_notes=scan.trust_notes
+            or build_trust_notes(
+                source_type=source_type,
+                match_status=match_status,
+                ocr_status=ocr_status,
+                ai_status=ai_status,
             ),
         )
 
@@ -296,9 +289,9 @@ def create_scan(
         db.refresh(new_scan)
 
         return new_scan
-    except Exception as e:
+    except Exception as exc:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to create scan: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create scan: {str(exc)}")
 
 
 @router.get("/my", response_model=list[ScanResponse])
@@ -314,8 +307,8 @@ def get_my_scans(
             .all()
         )
         return scans
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch scans: {str(e)}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch scans: {str(exc)}")
 
 
 @router.post("/upload", response_model=ScanResponse)
@@ -324,22 +317,15 @@ def upload_scan_image(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    extension = validate_image_upload_metadata(file)
-
-    os.makedirs("uploads", exist_ok=True)
-    _, save_path = build_upload_path(extension)
+    save_path = None
 
     try:
-        file_bytes = file.file.read()
-        validate_upload_bytes(file_bytes)
-
-        with open(save_path, "wb") as buffer:
-            buffer.write(file_bytes)
+        save_path = save_upload_file(file)
 
         barcode = extract_barcode(save_path)
         ocr_result = extract_text_with_confidence(save_path)
         raw_text = ocr_result.raw_text
-        cleaned_text = ocr_result.cleaned_text
+        cleaned_text = ocr_result.cleaned_text or clean_text(raw_text)
 
         extracted_name = extract_medicine_name(cleaned_text)
         extracted_manufacturer = extract_manufacturer(cleaned_text)
@@ -383,6 +369,20 @@ def upload_scan_image(
             )
             medicine_id = None
 
+        source_type = "image_upload"
+        match_status = get_match_status(
+            catalog_match,
+            fallback="ocr_extracted" if cleaned_text else "unknown",
+        )
+        ai_status = get_ai_status(translated_result)
+        trust_notes = build_trust_notes(
+            source_type=source_type,
+            match_status=match_status,
+            ocr_status=ocr_result.status,
+            ai_status=ai_status,
+            ocr_error=ocr_result.error,
+        )
+
         new_scan = ScanRecord(
             user_id=current_user.id,
             image_path=save_path,
@@ -412,9 +412,9 @@ def upload_scan_image(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as exc:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to process uploaded image: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to process uploaded image: {str(exc)}")
 
 
 @router.post("/barcode", response_model=ScanResponse)
@@ -476,6 +476,16 @@ def scan_by_barcode(
             )
             medicine_id = None
 
+        source_type = "barcode"
+        match_status = get_match_status(catalog_match, fallback="barcode_unknown")
+        ai_status = get_ai_status(translated_result)
+        trust_notes = build_trust_notes(
+            source_type=source_type,
+            match_status=match_status,
+            ocr_status="not_applicable",
+            ai_status=ai_status,
+        )
+
         new_scan = ScanRecord(
             user_id=current_user.id,
             image_path=None,
@@ -505,9 +515,9 @@ def scan_by_barcode(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as exc:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to process barcode: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to process barcode: {str(exc)}")
 
 
 @router.post("/upload-prescription", response_model=ScanResponse)
@@ -516,21 +526,14 @@ def upload_prescription(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    extension = validate_image_upload_metadata(file)
-
-    os.makedirs("uploads", exist_ok=True)
-    _, save_path = build_upload_path(extension)
+    save_path = None
 
     try:
-        file_bytes = file.file.read()
-        validate_upload_bytes(file_bytes)
-
-        with open(save_path, "wb") as f:
-            f.write(file_bytes)
+        save_path = save_upload_file(file)
 
         ocr_result = extract_text_with_confidence(save_path)
         raw_text = ocr_result.raw_text
-        cleaned_text = ocr_result.cleaned_text
+        cleaned_text = ocr_result.cleaned_text or clean_text(raw_text)
 
         translated_result = safe_explanation(
             medicine_name=None,
@@ -580,9 +583,9 @@ def upload_prescription(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as exc:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to process prescription image: {str(exc)}")
 
 
 class ScanQuestionRequest(BaseModel):
@@ -622,7 +625,7 @@ def ask_about_scan(
             f"Medicine: {scan.medicine_name or 'Unknown medicine'}\n"
             f"Usage: {scan.usage or 'Not available'}\n"
             f"Dosage: {scan.dosage or 'Not available'}\n"
-            f"Note: AI service is temporarily unavailable, so this is a limited fallback answer."
+            "Note: AI service is temporarily unavailable, so this is a limited fallback answer."
         )
 
     return {
