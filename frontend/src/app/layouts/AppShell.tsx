@@ -1,4 +1,5 @@
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Bell,
   Clock3,
@@ -33,7 +34,12 @@ function navClass(isActive: boolean) {
 
 export function AppShell() {
   const navigate = useNavigate();
+  const location = useLocation();
   const clearSession = useAuthStore((state) => state.clearSession);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [location.pathname]);
 
   function handleLogout() {
     clearSession();
@@ -95,7 +101,7 @@ export function AppShell() {
         </aside>
 
         <div className="min-w-0 flex-1">
-          <header className="sticky top-0 z-30 border-b border-[#e7ebdf] bg-[#f6f8f4]/90 backdrop-blur">
+          <header className="sticky top-0 z-30 border-b border-[#e7ebdf] bg-[#f6f8f4]/95 backdrop-blur">
             <div className="flex items-center gap-4 px-5 py-5 lg:px-8">
               <div className="hidden md:flex h-14 w-full max-w-[440px] items-center gap-3 rounded-full border border-[#d9e1ee] bg-white px-5 text-[#7a879d] shadow-sm">
                 <Search className="h-5 w-5" strokeWidth={2.2} />
@@ -155,7 +161,7 @@ export function AppShell() {
             </div>
           </header>
 
-          <main className="px-4 py-6 lg:px-8 lg:py-8">
+          <main className="px-4 pb-8 pt-10 lg:px-8 lg:pb-10 lg:pt-12">
             <Outlet />
           </main>
         </div>
