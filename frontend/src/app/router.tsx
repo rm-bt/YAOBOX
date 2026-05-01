@@ -17,7 +17,7 @@ import HistoryPage from "../features/history/pages/HistoryPage";
 import ProfilePage from "../features/profile/pages/ProfilePage";
 import RemindersPage from "../features/reminders/pages/RemindersPage";
 import CreateReminderPage from "../features/reminders/pages/CreateReminderPage";
-
+import SettingsPage from "../features/settings/pages/SettingsPage";
 export function AppRouter() {
   return (
     <Routes>
@@ -35,6 +35,7 @@ export function AppRouter() {
           <Route path="/scan" element={<ScanPage />} />
           <Route path="/scan/processing" element={<ProcessingPage />} />
           <Route path="/scan/result" element={<ScanResultPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
 
           <Route path="/history" element={<HistoryPage />} />
 

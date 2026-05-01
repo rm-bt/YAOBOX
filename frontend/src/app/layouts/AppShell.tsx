@@ -21,6 +21,7 @@ const navItems = [
   { to: "/scan", label: "Scan", icon: ScanLine },
   { to: "/history", label: "History", icon: History },
   { to: "/reminders", label: "Reminders", icon: Clock3 },
+  { to: "/settings", label: "Settings", icon: Settings },
   { to: "/profile", label: "Profile", icon: UserRound },
 ];
 
@@ -49,9 +50,9 @@ export function AppShell() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f6f8f4] text-[#0f1c3f]">
+    <div className="min-h-screen bg-[#f6f8f4] text-[#0f1c3f] dark:bg-slate-950 dark:text-slate-100">
       <div className="flex min-h-screen">
-        <aside className="hidden lg:flex w-[304px] shrink-0 flex-col border-r border-[#e7ebdf] bg-white/40 px-5 py-6">
+        <aside className="hidden lg:flex w-[304px] shrink-0 flex-col border-r border-[#e7ebdf] bg-white/40 px-5 py-6 dark:border-slate-800 dark:bg-slate-950">
           <Link to="/dashboard" className="flex items-center gap-4 px-4 py-4">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#d9e9c6] text-[#4b5a3e]">
               <Pill className="h-7 w-7 -rotate-45" strokeWidth={2.4} />
@@ -103,7 +104,7 @@ export function AppShell() {
         </aside>
 
         <div className="min-w-0 flex-1">
-          <header className="sticky top-0 z-30 border-b border-[#e7ebdf] bg-[#f6f8f4]/95 backdrop-blur">
+          <header className="sticky top-0 z-30 border-b border-[#e7ebdf] bg-[#f6f8f4]/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
             <div className="flex items-center gap-4 px-5 py-5 lg:px-8">
               <div className="hidden md:flex h-14 w-full max-w-[440px] items-center gap-3 rounded-full border border-[#d9e1ee] bg-white px-5 text-[#7a879d] shadow-sm">
                 <Search className="h-5 w-5" strokeWidth={2.2} />
@@ -122,21 +123,24 @@ export function AppShell() {
                   <Bell className="h-6 w-6" strokeWidth={2.1} />
                 </button>
 
-                <button
-                  type="button"
-                  className="flex h-11 w-11 items-center justify-center rounded-full text-[#70809b] transition-all hover:bg-white hover:text-[#13224a]"
-                >
-                  <Settings className="h-6 w-6" strokeWidth={2.1} />
-                </button>
+                <Link
+                   to="/settings"
+                   className="flex h-11 w-11 items-center justify-center rounded-full text-[#70809b] transition-all hover:bg-white hover:text-[#13224a] dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+                   title="Settings"
+                > 
+                    <Settings className="h-6 w-6" strokeWidth={2.1} />
+                </Link>
+                
 
                 <Link
-  to="/profile"
-  className={`flex h-14 w-14 items-center justify-center rounded-full border-2 border-white ${avatar.bgClass} text-[#425235] shadow-sm text-2xl`}
-  title={`Avatar: ${avatar.label}`}
->
-  <span aria-hidden="true">{avatar.emoji}</span>
-  <span className="sr-only">Open profile</span>
-</Link>
+                
+                   to="/profile"
+                    className={`flex h-14 w-14 items-center justify-center rounded-full border-2 border-white ${avatar.bgClass} text-[#425235] shadow-sm text-2xl`}
+                    title={`Avatar: ${avatar.label}`}
+                >
+                   <span aria-hidden="true">{avatar.emoji}</span>
+                   <span className="sr-only">Open profile</span>
+                </Link>
               </div>
             </div>
 
