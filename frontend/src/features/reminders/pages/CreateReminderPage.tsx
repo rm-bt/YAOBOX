@@ -11,10 +11,10 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
-const API_BASE_URL =
-  (import.meta as ImportMeta & {
-    env?: { VITE_API_BASE_URL?: string };
-  }).env?.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
+import {
+  createReminder,
+  type ReminderCreatePayload,
+} from "../../../api/reminders.api";
 
 type ReminderPrefillState = {
   medicineId?: string | number;
@@ -25,110 +25,46 @@ type ReminderPrefillState = {
 
 type ReminderFormState = {
   medicineId: string;
+  medicineName: string;
   reminderTime: string;
   frequency: string;
   dosageNote: string;
   isActive: boolean;
 };
 
-function getStoredToken(): string | null {
-  const directKeys = [
-    "yaobox_access_token",
-    "access_token",
-    "token",
-    "auth_token",
-    "yaobox_token",
-  ];
-
-  for (const key of directKeys) {
-    const value = window.localStorage.getItem(key);
+function firstNonEmptyString(...values: unknown[]): string {
+  for (const value of values) {
     if (typeof value === "string" && value.trim()) return value.trim();
   }
 
-  const jsonKeys = ["session", "auth", "auth-storage", "yaobox-auth"];
-
-  for (const key of jsonKeys) {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) continue;
-
-    try {
-      const parsed = JSON.parse(raw) as Record<string, unknown>;
-      const candidates = [
-        parsed.access_token,
-        parsed.token,
-        (parsed.session as Record<string, unknown> | undefined)?.access_token,
-        (parsed.session as Record<string, unknown> | undefined)?.token,
-        (parsed.state as Record<string, unknown> | undefined)?.access_token,
-        (parsed.state as Record<string, unknown> | undefined)?.token,
-        (
-          (parsed.state as Record<string, unknown> | undefined)
-            ?.session as Record<string, unknown> | undefined
-        )?.access_token,
-        (
-          (parsed.state as Record<string, unknown> | undefined)
-            ?.session as Record<string, unknown> | undefined
-        )?.token,
-      ];
-
-      const found = candidates.find(
-        (value): value is string => typeof value === "string" && value.length > 0
-      );
-
-      if (found) return found;
-    } catch {
-      // ignore malformed storage values
-    }
-  }
-
-  return null;
-}
-
-async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getStoredToken();
-
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      Accept: "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `Request failed for ${path} with status ${response.status}`);
-  }
-
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return (await response.json()) as T;
+  return "";
 }
 
 function buildCreatePayload(
   form: ReminderFormState,
   state: ReminderPrefillState
-): Record<string, unknown> {
-  const payload: Record<string, unknown> = {
+): ReminderCreatePayload {
+  const payload: ReminderCreatePayload = {
     reminder_time: form.reminderTime,
     frequency: form.frequency,
-    dosage_note: form.dosageNote,
+    dosage_note: form.dosageNote.trim() || null,
     is_active: form.isActive,
   };
 
   const cleanMedicineId = form.medicineId.trim();
+  const cleanMedicineName = form.medicineName.trim();
+
   if (cleanMedicineId) {
     payload.medicine_id = cleanMedicineId;
   }
 
-  if (state.medicineName?.trim()) {
-    payload.medicine_name = state.medicineName.trim();
+  if (cleanMedicineName) {
+    payload.medicine_name = cleanMedicineName;
   }
 
   if (state.sourceScanId !== undefined && state.sourceScanId !== null) {
     const numericScanId = Number(state.sourceScanId);
+
     if (!Number.isNaN(numericScanId)) {
       payload.scan_id = numericScanId;
     }
@@ -144,39 +80,42 @@ export default function CreateReminderPage() {
 
   const state = (location.state ?? {}) as ReminderPrefillState;
 
-  const prefillMedicineName = useMemo(
-    () => state.medicineName?.trim() || "Medication reminder",
-    [state.medicineName]
+  const initialMedicineName = firstNonEmptyString(
+    state.medicineName,
+    "Medication reminder"
   );
 
   const [form, setForm] = useState<ReminderFormState>({
     medicineId: state.medicineId ? String(state.medicineId) : "",
+    medicineName: initialMedicineName,
     reminderTime: "",
     frequency: "daily",
     dosageNote: state.dosageNote ?? "",
     isActive: true,
   });
 
-  const createReminder = useMutation({
-    mutationFn: async (payload: Record<string, unknown>) =>
-      requestJson<unknown>("/reminders/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      }),
+  const prefillMedicineName = useMemo(
+    () => firstNonEmptyString(form.medicineName, "Medication reminder"),
+    [form.medicineName]
+  );
+
+  const createReminderMutation = useMutation({
+    mutationFn: (payload: ReminderCreatePayload) => createReminder(payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["reminders"] });
-      await queryClient.refetchQueries({ queryKey: ["reminders"], exact: true });
       navigate("/reminders", { replace: true });
     },
   });
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    createReminder.reset();
-    createReminder.mutate(buildCreatePayload(form, state));
+
+    if (!form.reminderTime) {
+      return;
+    }
+
+    createReminderMutation.reset();
+    createReminderMutation.mutate(buildCreatePayload(form, state));
   }
 
   return (
@@ -191,8 +130,7 @@ export default function CreateReminderPage() {
         </h1>
 
         <p className="text-lg text-slate-600 max-w-3xl leading-relaxed">
-          Use the same clean reminder language from the main reminders page, but
-          focus this screen on one task only: setting a reminder from a result.
+          Set one reminder from a scan result or create one manually.
         </p>
 
         <div className="inline-flex items-center gap-2 rounded-full bg-brand-primary-container/40 px-4 py-2 text-sm font-semibold text-brand-on-primary-container">
@@ -214,13 +152,15 @@ export default function CreateReminderPage() {
                   Linked medicine
                 </h2>
                 <p className="text-sm text-slate-500">
-                  Coming from the result flow when available.
+                  Prefilled from scan or history when available.
                 </p>
               </div>
             </div>
 
             <div className="rounded-[24px] bg-slate-50 border border-slate-100 px-5 py-5">
-              <p className="font-bold text-slate-900 text-lg">{prefillMedicineName}</p>
+              <p className="font-bold text-slate-900 text-lg">
+                {prefillMedicineName}
+              </p>
 
               {state.sourceScanId ? (
                 <p className="text-sm text-slate-500 mt-2">
@@ -230,7 +170,9 @@ export default function CreateReminderPage() {
 
               {form.dosageNote ? (
                 <div className="mt-4 rounded-[18px] bg-white px-4 py-3 text-sm text-slate-700">
-                  <span className="font-semibold text-slate-900">Suggested note:</span>{" "}
+                  <span className="font-semibold text-slate-900">
+                    Suggested note:
+                  </span>{" "}
                   {form.dosageNote}
                 </div>
               ) : null}
@@ -246,8 +188,8 @@ export default function CreateReminderPage() {
             </div>
 
             <p className="text-sm text-slate-600 leading-relaxed">
-              The architecture expects users to move from scan result to reminder
-              creation in one obvious path. Keep this page boring, fast, and clear.
+              This page now uses the shared authenticated reminder API. No duplicate
+              token handling. No private fetch logic. Much less fragile.
             </p>
           </div>
         </div>
@@ -262,7 +204,9 @@ export default function CreateReminderPage() {
               <Plus className="w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-900">Reminder details</h2>
+              <h2 className="text-xl font-bold text-slate-900">
+                Reminder details
+              </h2>
               <p className="text-sm text-slate-500">
                 Set time, frequency, note, and activation state.
               </p>
@@ -272,7 +216,25 @@ export default function CreateReminderPage() {
           <form className="space-y-5" onSubmit={handleSubmit}>
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-800">
-                Medicine ID (optional)
+                Medicine name
+              </label>
+              <input
+                type="text"
+                value={form.medicineName}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    medicineName: event.target.value,
+                  }))
+                }
+                placeholder="Medicine name"
+                className="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-800">
+                Medicine ID optional
               </label>
               <input
                 type="text"
@@ -283,7 +245,7 @@ export default function CreateReminderPage() {
                     medicineId: event.target.value,
                   }))
                 }
-                placeholder="Leave blank unless you know the linked medicine id"
+                placeholder="Leave blank unless linked to catalog"
                 className="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10"
               />
             </div>
@@ -362,15 +324,15 @@ export default function CreateReminderPage() {
               </span>
             </label>
 
-            {createReminder.isError ? (
+            {createReminderMutation.isError ? (
               <div className="rounded-[20px] bg-red-50 border border-red-100 px-4 py-4 text-sm text-red-700 leading-relaxed whitespace-pre-wrap break-words">
-                {createReminder.error instanceof Error
-                  ? createReminder.error.message
+                {createReminderMutation.error instanceof Error
+                  ? createReminderMutation.error.message
                   : "Reminder creation failed."}
               </div>
             ) : null}
 
-            {createReminder.isSuccess ? (
+            {createReminderMutation.isSuccess ? (
               <div className="rounded-[20px] bg-emerald-50 border border-emerald-100 px-4 py-4 text-sm text-emerald-700 leading-relaxed flex items-start gap-2">
                 <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
                 <span>Reminder created successfully.</span>
@@ -380,10 +342,10 @@ export default function CreateReminderPage() {
             <div className="flex flex-wrap gap-3 pt-1">
               <button
                 type="submit"
-                disabled={createReminder.isPending}
+                disabled={createReminderMutation.isPending}
                 className="rounded-full bg-brand-secondary px-6 py-3.5 text-white font-bold shadow-lg shadow-brand-secondary/20 transition-all hover:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {createReminder.isPending ? "Creating..." : "Create reminder"}
+                {createReminderMutation.isPending ? "Creating..." : "Create reminder"}
               </button>
 
               <button

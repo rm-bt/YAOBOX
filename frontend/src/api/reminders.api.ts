@@ -3,21 +3,25 @@ import { apiClient } from "./client";
 export type ReminderItem = {
   id: number;
   user_id: number;
+  scan_id?: number | null;
   medicine_id?: string | number | null;
   medicine_name?: string | null;
+  dosage?: string | null;
+  dosage_note?: string | null;
   reminder_time: string;
   frequency: string;
-  dosage_note?: string | null;
   is_active: boolean;
   created_at?: string | null;
 };
 
 export type ReminderCreatePayload = {
+  scan_id?: string | number | null;
   medicine_id?: string | number | null;
   medicine_name?: string | null;
+  dosage?: string | null;
+  dosage_note?: string | null;
   reminder_time: string;
   frequency: string;
-  dosage_note?: string | null;
   is_active?: boolean;
 };
 
