@@ -22,6 +22,8 @@ import { getHistory, type ScanHistoryItem } from "../../../api/history.api";
 import { getReminders, type ReminderItem } from "../../../api/reminders.api";
 import { getCurrentUser } from "../../../api/users.api";
 import { useAuthStore } from "../../auth/store/auth.store";
+import { AVATAR_OPTIONS } from "../../../lib/avatar";
+import { useAvatar } from "../../../hooks/useAvatar";
 
 type RawRecord = Record<string, unknown>;
 
@@ -129,7 +131,7 @@ export default function ProfilePage() {
   const navigate = useNavigate();
   const clearSession = useAuthStore((state) => state.clearSession);
   const storedToken = useAuthStore((state) => state.token);
-
+const { avatarId, avatar, setAvatarId } = useAvatar();
   const decodedToken = useMemo(() => decodeJwtPayload(storedToken), [storedToken]);
 
   const profileQuery = useQuery({
@@ -290,23 +292,59 @@ export default function ProfilePage() {
             className="bg-white border border-slate-100 rounded-[28px] p-6 shadow-sm relative overflow-hidden flex flex-col items-center text-center"
           >
             <div className="absolute top-0 left-0 w-full h-20 bg-brand-primary-container/40" />
-            <div className="w-24 h-24 rounded-full border-4 border-white mt-6 z-10 bg-brand-primary-container/40 flex items-center justify-center shadow-md">
-              <UserRound className="w-12 h-12 text-brand-on-primary-container" />
-            </div>
+            <div
+  className={`w-24 h-24 rounded-full border-4 border-white mt-6 z-10 ${avatar.bgClass} flex items-center justify-center shadow-md text-5xl`}
+  title={`Avatar: ${avatar.label}`}
+>
+  <span aria-hidden="true">{avatar.emoji}</span>
+  <span className="sr-only">Selected avatar: {avatar.label}</span>
+</div>
 
             <div className="mt-4 w-full">
               <h3 className="text-2xl font-semibold text-slate-900">{fullName}</h3>
               <p className="text-slate-500 text-sm mb-6">{email}</p>
 
               <div className="text-left bg-slate-50 rounded-[20px] p-4 mb-4 border border-slate-100">
-                <p className="text-xs text-slate-500 mb-1 font-medium">
-                  Language preference
-                </p>
-                <div className="flex justify-between items-center">
-                  <p className="text-slate-900 font-medium">{languagePref}</p>
-                  <Globe2 className="w-4 h-4 text-slate-400" />
-                </div>
-              </div>
+  <p className="text-xs text-slate-500 mb-3 font-medium">
+    Choose avatar
+  </p>
+
+  <div className="grid grid-cols-3 gap-3">
+    {AVATAR_OPTIONS.map((option) => {
+      const isSelected = option.id === avatarId;
+
+      return (
+        <button
+          key={option.id}
+          type="button"
+          onClick={() => setAvatarId(option.id)}
+          className={[
+            "flex flex-col items-center justify-center gap-2 rounded-[18px] border px-3 py-3 transition-all",
+            isSelected
+              ? "border-brand-primary bg-white shadow-sm ring-2 ring-brand-primary/20"
+              : "border-slate-200 bg-white/60 hover:bg-white hover:border-slate-300",
+          ].join(" ")}
+          title={option.label}
+        >
+          <span
+            className={`flex h-11 w-11 items-center justify-center rounded-full ${option.bgClass} text-2xl`}
+            aria-hidden="true"
+          >
+            {option.emoji}
+          </span>
+
+          <span className="text-[11px] font-semibold text-slate-600 text-center leading-tight">
+            {option.label}
+          </span>
+        </button>
+      );
+    })}
+  </div>
+
+  <p className="mt-3 text-xs text-slate-500 leading-relaxed">
+    This avatar is saved on this browser and appears in the top profile icon.
+  </p>
+</div>
 
               <div className="text-left bg-slate-50 rounded-[20px] p-4 mb-6 border border-slate-100">
                 <p className="text-xs text-slate-500 mb-1 font-medium">Password</p>

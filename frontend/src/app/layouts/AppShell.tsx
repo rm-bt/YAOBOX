@@ -14,6 +14,7 @@ import {
   Plus,
 } from "lucide-react";
 import { useAuthStore } from "../../features/auth/store/auth.store";
+import { useAvatar } from "../../hooks/useAvatar";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -36,6 +37,7 @@ export function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const clearSession = useAuthStore((state) => state.clearSession);
+  const { avatar } = useAvatar();
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
@@ -128,11 +130,13 @@ export function AppShell() {
                 </button>
 
                 <Link
-                  to="/profile"
-                  className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-white bg-[#d9e9c6] text-[#425235] shadow-sm"
-                >
-                  <UserRound className="h-7 w-7" strokeWidth={2.1} />
-                </Link>
+  to="/profile"
+  className={`flex h-14 w-14 items-center justify-center rounded-full border-2 border-white ${avatar.bgClass} text-[#425235] shadow-sm text-2xl`}
+  title={`Avatar: ${avatar.label}`}
+>
+  <span aria-hidden="true">{avatar.emoji}</span>
+  <span className="sr-only">Open profile</span>
+</Link>
               </div>
             </div>
 
