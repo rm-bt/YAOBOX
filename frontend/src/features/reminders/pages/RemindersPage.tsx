@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
+import { useReminderNotifications } from "../hooks/useReminderNotifications";
 import {
   AlarmClock,
   BellRing,
@@ -248,7 +249,7 @@ export default function RemindersPage() {
     () => activeReminders.filter((item) => isDueToday(item.reminderTimeRaw)),
     [activeReminders]
   );
-
+const reminderNotifications = useReminderNotifications(activeReminders);
   const isAnyMutationPending =
     createReminderMutation.isPending ||
     updateReminderMutation.isPending ||
@@ -325,6 +326,38 @@ export default function RemindersPage() {
           <ShieldCheck size={16} />
           Reminders support medication management. They do not replace medical advice.
         </div>
+        <div className="rounded-[24px] border border-slate-100 bg-white px-5 py-4 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+  <div>
+    <p className="text-sm font-bold text-slate-900">Browser reminder notifications</p>
+    <p className="text-sm text-slate-500 mt-1 leading-relaxed">
+      {reminderNotifications.supported
+        ? reminderNotifications.enabled
+          ? `Notifications are enabled. Watching ${reminderNotifications.activeReminderCount} active reminder(s).`
+          : reminderNotifications.permission === "denied"
+            ? "Notifications are blocked in this browser. Enable them from browser site settings."
+            : "Enable notifications so YAOBOX can alert you while the app is open."
+        : "This browser does not support notification alerts."}
+    </p>
+
+    {reminderNotifications.lastNotificationLabel ? (
+      <p className="text-xs text-brand-primary font-semibold mt-2">
+        Last notification: {reminderNotifications.lastNotificationLabel}
+      </p>
+    ) : null}
+  </div>
+
+  {reminderNotifications.supported && !reminderNotifications.enabled ? (
+    <button
+      type="button"
+      onClick={() => {
+        void reminderNotifications.requestPermission();
+      }}
+      className="rounded-full bg-brand-secondary px-5 py-3 text-sm font-bold text-white shadow-lg shadow-brand-secondary/20 hover:brightness-95 transition-all"
+    >
+      Enable notifications
+    </button>
+  ) : null}
+</div>
       </header>
 
       <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
