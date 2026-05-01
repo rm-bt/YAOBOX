@@ -14,19 +14,9 @@ import {
   Upload,
 } from "lucide-react";
 
-const API_BASE_URL =
-  (import.meta as ImportMeta & {
-    env?: { VITE_API_BASE_URL?: string };
-  }).env?.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
-
-type RawRecord = Record<string, unknown>;
-
-type DashboardUser = {
-  id?: string | number;
-  full_name?: string;
-  email?: string;
-  language_pref?: string | null;
-};
+import { getCurrentUser } from "../../../api/users.api";
+import { getHistory, type ScanHistoryItem } from "../../../api/history.api";
+import { getReminders, type ReminderItem } from "../../../api/reminders.api";
 
 type DashboardHistoryItem = {
   id: string;
@@ -47,129 +37,26 @@ type DashboardReminderItem = {
   reminderTimeRaw: string;
 };
 
-function getStoredToken(): string | null {
-  const directKeys = [
-    "yaobox_access_token",
-    "access_token",
-    "token",
-    "auth_token",
-    "yaobox_token",
-  ];
-
-  for (const key of directKeys) {
-    const value = window.localStorage.getItem(key);
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-
-  const jsonKeys = ["session", "auth", "auth-storage", "yaobox-auth"];
-
-  for (const key of jsonKeys) {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) continue;
-
-    try {
-      const parsed = JSON.parse(raw) as Record<string, unknown>;
-      const candidates = [
-        parsed.access_token,
-        parsed.token,
-        (parsed.session as Record<string, unknown> | undefined)?.access_token,
-        (parsed.session as Record<string, unknown> | undefined)?.token,
-        (parsed.state as Record<string, unknown> | undefined)?.access_token,
-        (parsed.state as Record<string, unknown> | undefined)?.token,
-        (
-          (parsed.state as Record<string, unknown> | undefined)
-            ?.session as Record<string, unknown> | undefined
-        )?.access_token,
-        (
-          (parsed.state as Record<string, unknown> | undefined)
-            ?.session as Record<string, unknown> | undefined
-        )?.token,
-      ];
-
-      const found = candidates.find(
-        (value): value is string => typeof value === "string" && value.length > 0
-      );
-
-      if (found) return found.trim();
-    } catch {
-      // ignore malformed values
-    }
-  }
-
-  return null;
-}
-
-async function requestJsonFromPaths<T>(paths: string[]): Promise<T> {
-  const token = getStoredToken();
-  let lastError: Error | null = null;
-
-  for (const path of paths) {
-    try {
-      const response = await fetch(`${API_BASE_URL}${path}`, {
-        headers: {
-          Accept: "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          continue;
-        }
-
-        const text = await response.text();
-        throw new Error(
-          text || `Request failed for ${path} with status ${response.status}`
-        );
-      }
-
-      if (response.status === 204) {
-        return undefined as T;
-      }
-
-      return (await response.json()) as T;
-    } catch (error) {
-      lastError =
-        error instanceof Error ? error : new Error("Unknown request failure");
-    }
-  }
-
-  throw lastError ?? new Error("No dashboard endpoint responded successfully.");
-}
-
-function asArray<T>(value: unknown): T[] {
-  if (Array.isArray(value)) return value as T[];
-
-  if (value && typeof value === "object") {
-    const objectValue = value as Record<string, unknown>;
-    const nested = [
-      objectValue.items,
-      objectValue.results,
-      objectValue.data,
-      objectValue.history,
-      objectValue.reminders,
-      objectValue.records,
-    ].find(Array.isArray);
-
-    if (Array.isArray(nested)) return nested as T[];
-  }
-
-  return [];
-}
-
 function firstNonEmptyString(...values: unknown[]): string {
   for (const value of values) {
-    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
   }
 
   return "";
 }
 
 function formatDateLabel(value: unknown): string {
-  if (typeof value !== "string" || !value) return "Recently";
+  if (typeof value !== "string" || !value) {
+    return "Recently";
+  }
 
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Recently";
+
+  if (Number.isNaN(date.getTime())) {
+    return "Recently";
+  }
 
   return new Intl.DateTimeFormat("en", {
     month: "short",
@@ -178,9 +65,12 @@ function formatDateLabel(value: unknown): string {
 }
 
 function formatTimeLabel(value: unknown): string {
-  if (typeof value !== "string" || !value) return "Time not set";
+  if (typeof value !== "string" || !value) {
+    return "Time not set";
+  }
 
   const fullDate = new Date(value);
+
   if (!Number.isNaN(fullDate.getTime())) {
     return new Intl.DateTimeFormat("en", {
       hour: "numeric",
@@ -189,7 +79,10 @@ function formatTimeLabel(value: unknown): string {
   }
 
   const timeOnly = value.trim();
-  if (/^\d{2}:\d{2}/.test(timeOnly)) return timeOnly.slice(0, 5);
+
+  if (/^\d{2}:\d{2}/.test(timeOnly)) {
+    return timeOnly.slice(0, 5);
+  }
 
   return timeOnly;
 }
@@ -198,6 +91,7 @@ function humanizeSourceType(value: string): string {
   const normalized = value.trim().toLowerCase();
 
   if (normalized === "image_upload") return "Image upload";
+  if (normalized === "prescription_upload") return "Prescription upload";
   if (normalized === "barcode") return "Barcode";
   if (normalized === "manual_entry") return "Manual entry";
   if (normalized === "prescription") return "Prescription";
@@ -206,27 +100,13 @@ function humanizeSourceType(value: string): string {
   return value.replace(/_/g, " ");
 }
 
-function buildConfidenceLabel(raw: RawRecord): string {
-  const confidence = raw.confidence;
-
-  if (typeof confidence === "number") {
-    return `${Math.round(confidence * 100)}% confidence`;
-  }
-
-  if (confidence && typeof confidence === "object") {
-    const objectConfidence = confidence as Record<string, unknown>;
-    const ocr = objectConfidence.ocr;
-
-    if (typeof ocr === "number") {
-      return `${Math.round(ocr * 100)}% OCR`;
-    }
-  }
-
+function buildConfidenceLabel(raw: ScanHistoryItem): string {
   if (typeof raw.ocr_confidence === "number") {
     return `${Math.round(raw.ocr_confidence * 100)}% OCR`;
   }
 
-  const sourceType = firstNonEmptyString(raw.source_type, raw.sourceType).toLowerCase();
+  const sourceType = firstNonEmptyString(raw.source_type).toLowerCase();
+
   if (sourceType === "barcode") {
     return "Barcode lookup";
   }
@@ -234,63 +114,43 @@ function buildConfidenceLabel(raw: RawRecord): string {
   return "Not scored";
 }
 
-function normalizeHistoryItem(raw: RawRecord): DashboardHistoryItem {
+function normalizeHistoryItem(raw: ScanHistoryItem): DashboardHistoryItem {
   const title =
     firstNonEmptyString(
       raw.medicine_name,
-      raw.title,
-      raw.name,
-      raw.barcode ? `Barcode ${String(raw.barcode)}` : ""
+      raw.barcode ? `Barcode ${raw.barcode}` : ""
     ) || "Saved scan";
 
   const subtitle =
     firstNonEmptyString(
       raw.translated_text,
-      raw.translatedSummary,
-      raw.translatedSummaryEn,
-      raw.translated_summary_en,
       raw.usage,
       raw.dosage,
-      raw.summary,
-      raw.note
+      raw.raw_ocr_text
     ) || "Saved scan result available";
 
   return {
-    id: String(raw.id ?? crypto.randomUUID()),
+    id: String(raw.id),
     title,
     subtitle,
     sourceType: humanizeSourceType(
-      firstNonEmptyString(raw.source_type, raw.sourceType, raw.match_status) || "scan"
+      firstNonEmptyString(raw.source_type, raw.match_status) || "scan"
     ),
-    createdAt: formatDateLabel(raw.created_at ?? raw.createdAt ?? raw.date),
+    createdAt: formatDateLabel(raw.created_at),
     confidenceText: buildConfidenceLabel(raw),
   };
 }
 
-function normalizeReminderItem(raw: RawRecord): DashboardReminderItem {
+function normalizeReminderItem(raw: ReminderItem): DashboardReminderItem {
   return {
-    id: String(raw.id ?? crypto.randomUUID()),
-    title:
-      firstNonEmptyString(
-        raw.title,
-        raw.medicine_name,
-        raw.medicineName
-      ) || "Medication reminder",
-    timeText: formatTimeLabel(
-      raw.reminder_time ?? raw.remind_time ?? raw.reminderTime ?? raw.remindTime ?? raw.time
-    ),
-    frequencyText:
-      firstNonEmptyString(raw.frequency, raw.repeat, raw.schedule) || "daily",
+    id: String(raw.id),
+    title: firstNonEmptyString(raw.medicine_name) || "Medication reminder",
+    timeText: formatTimeLabel(raw.reminder_time),
+    frequencyText: firstNonEmptyString(raw.frequency) || "daily",
     dosageText:
-      firstNonEmptyString(raw.dosage_note, raw.dosage, raw.note) || "No dosage note",
-    isActive: Boolean(raw.is_active ?? raw.isActive ?? true),
-    reminderTimeRaw: firstNonEmptyString(
-      raw.reminder_time,
-      raw.remind_time,
-      raw.reminderTime,
-      raw.remindTime,
-      raw.time
-    ),
+      firstNonEmptyString(raw.dosage_note, raw.dosage) || "No dosage note",
+    isActive: Boolean(raw.is_active ?? true),
+    reminderTimeRaw: firstNonEmptyString(raw.reminder_time),
   };
 }
 
@@ -315,7 +175,9 @@ const StatCard = ({
       {icon}
     </div>
     <div>
-      <div className="text-3xl font-bold text-slate-900 leading-none">{value}</div>
+      <div className="text-3xl font-bold text-slate-900 leading-none">
+        {value}
+      </div>
       <div className="text-slate-500 font-medium mt-2">{label}</div>
     </div>
   </motion.div>
@@ -367,43 +229,40 @@ const ActionCard = ({
 );
 
 export default function DashboardPage() {
-  const authToken = getStoredToken();
-
   const userQuery = useQuery({
     queryKey: ["dashboard", "user"],
-    queryFn: () => requestJsonFromPaths<DashboardUser>(["/users/me", "/users/me/"]),
+    queryFn: getCurrentUser,
     retry: false,
     staleTime: 60_000,
-    enabled: Boolean(authToken),
     refetchOnWindowFocus: false,
   });
 
   const historyQuery = useQuery({
-    queryKey: ["dashboard", "history"],
-    queryFn: () => requestJsonFromPaths<unknown>(["/history/", "/history"]),
+    queryKey: ["history"],
+    queryFn: getHistory,
     retry: false,
     staleTime: 30_000,
-    enabled: Boolean(authToken),
     refetchOnWindowFocus: false,
   });
 
   const remindersQuery = useQuery({
-    queryKey: ["dashboard", "reminders"],
-    queryFn: () => requestJsonFromPaths<unknown>(["/reminders/", "/reminders"]),
+    queryKey: ["reminders"],
+    queryFn: getReminders,
     retry: false,
     staleTime: 30_000,
-    enabled: Boolean(authToken),
     refetchOnWindowFocus: false,
   });
 
-  const historyRecords = asArray<RawRecord>(historyQuery.data).map(normalizeHistoryItem);
+  const historyRecords = (historyQuery.data ?? []).map(normalizeHistoryItem);
 
-  const reminderRecords = asArray<RawRecord>(remindersQuery.data)
+  const reminderRecords = (remindersQuery.data ?? [])
     .map(normalizeReminderItem)
     .filter((item) => item.isActive);
 
   const userName =
-    firstNonEmptyString(userQuery.data?.full_name, userQuery.data?.email) || "there";
+    firstNonEmptyString(userQuery.data?.full_name, userQuery.data?.email) ||
+    "there";
+
   const firstName = userName.split(" ")[0] || "there";
 
   const totalScans = historyRecords.length;
@@ -439,8 +298,8 @@ export default function DashboardPage() {
         </h1>
 
         <p className="text-lg text-slate-600 max-w-2xl leading-relaxed">
-          Keep the main action obvious: scan medicine, review recent results, and stay
-          on top of reminders without drowning the page in noise.
+          Keep the main action obvious: scan medicine, review recent results, and
+          stay on top of reminders without drowning the page in noise.
         </p>
 
         <div className="inline-flex items-center gap-2 rounded-full bg-brand-primary-container/40 px-4 py-2 text-sm font-semibold text-brand-on-primary-container">
@@ -456,6 +315,7 @@ export default function DashboardPage() {
           label="Saved scans"
           colorClass="bg-brand-primary-container/40 text-brand-on-primary-container"
         />
+
         <StatCard
           icon={<Clock3 size={28} />}
           value={remindersQuery.isLoading ? "..." : String(activeReminders)}
@@ -483,18 +343,21 @@ export default function DashboardPage() {
             title="Scan Medicine"
             description="Start image upload or camera capture for medicine, prescription, or report."
           />
+
           <ActionCard
             to="/scan"
             icon={<Upload size={24} />}
             title="Upload Prescription"
             description="Jump straight into the OCR and translation workflow."
           />
+
           <ActionCard
             to="/history"
             icon={<History size={24} />}
             title="View History"
             description="Reopen prior scans and review translated details."
           />
+
           <ActionCard
             to="/reminders"
             icon={<BellRing size={24} />}
@@ -517,9 +380,9 @@ export default function DashboardPage() {
 
             <p className="text-slate-600 mb-6 leading-relaxed max-w-2xl">
               This product is for understanding Chinese medicine information and
-              managing your own records. It can extract text, translate it,
-              explain it, save it, and help you create reminders. It is not a
-              diagnosis engine and it should not pretend otherwise.
+              managing your own records. It can extract text, translate it, explain
+              it, save it, and help you create reminders. It is not a diagnosis
+              engine and it should not pretend otherwise.
             </p>
 
             <div className="flex flex-wrap gap-3">
@@ -637,8 +500,12 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <p className="mt-4 font-bold text-slate-900">{nextReminder.title}</p>
-              <p className="mt-1 text-sm text-slate-700">{nextReminder.dosageText}</p>
+              <p className="mt-4 font-bold text-slate-900">
+                {nextReminder.title}
+              </p>
+              <p className="mt-1 text-sm text-slate-700">
+                {nextReminder.dosageText}
+              </p>
 
               <div className="mt-3 inline-flex px-3 py-1 rounded-full bg-white text-xs font-bold text-slate-700">
                 {nextReminder.frequencyText}
