@@ -9,31 +9,21 @@ import {
   EyeOff,
   Globe2,
   History,
-  Loader2,
   LogOut,
-  Mail,
   Pill,
   QrCode,
   Scan,
   ShieldCheck,
   UserRound,
 } from "lucide-react";
+
+import { env } from "../../../app/config/env";
+import { getHistory, type ScanHistoryItem } from "../../../api/history.api";
+import { getReminders, type ReminderItem } from "../../../api/reminders.api";
+import { getCurrentUser } from "../../../api/users.api";
 import { useAuthStore } from "../../auth/store/auth.store";
 
-const API_BASE_URL =
-  (import.meta as ImportMeta & {
-    env?: { VITE_API_BASE_URL?: string };
-  }).env?.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
-
 type RawRecord = Record<string, unknown>;
-
-type UserProfile = {
-  id?: string | number;
-  email?: string;
-  full_name?: string;
-  language_pref?: string;
-  created_at?: string;
-};
 
 type ActivityItem = {
   id: string;
@@ -48,51 +38,8 @@ function firstNonEmptyString(...values: unknown[]): string {
   for (const value of values) {
     if (typeof value === "string" && value.trim()) return value.trim();
   }
+
   return "";
-}
-
-function getStoredToken(): string | null {
-  const directKeys = [
-    "yaobox_access_token",
-    "access_token",
-    "token",
-    "auth_token",
-    "yaobox_token",
-  ];
-
-  for (const key of directKeys) {
-    const value = window.localStorage.getItem(key);
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-
-  const jsonKeys = ["session", "auth", "auth-storage", "yaobox-auth"];
-
-  for (const key of jsonKeys) {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) continue;
-
-    try {
-      const parsed = JSON.parse(raw) as Record<string, unknown>;
-      const candidates = [
-        parsed.access_token,
-        parsed.token,
-        (parsed.session as Record<string, unknown> | undefined)?.access_token,
-        (parsed.session as Record<string, unknown> | undefined)?.token,
-        (parsed.state as Record<string, unknown> | undefined)?.access_token,
-        (parsed.state as Record<string, unknown> | undefined)?.token,
-      ];
-
-      for (const candidate of candidates) {
-        if (typeof candidate === "string" && candidate.trim()) {
-          return candidate.trim();
-        }
-      }
-    } catch {
-      // ignore malformed storage values
-    }
-  }
-
-  return null;
 }
 
 function decodeJwtPayload(token: string | null): Record<string, unknown> | null {
@@ -110,67 +57,6 @@ function decodeJwtPayload(token: string | null): Record<string, unknown> | null 
   }
 }
 
-async function requestJsonFromPaths<T>(
-  paths: string[],
-  init?: RequestInit
-): Promise<T> {
-  const token = getStoredToken();
-  let lastError: Error | null = null;
-
-  for (const path of paths) {
-    try {
-      const response = await fetch(`${API_BASE_URL}${path}`, {
-        ...init,
-        headers: {
-          Accept: "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          ...(init?.headers ?? {}),
-        },
-      });
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          continue;
-        }
-
-        const text = await response.text();
-        throw new Error(text || `Request failed for ${path} with status ${response.status}`);
-      }
-
-      if (response.status === 204) {
-        return undefined as T;
-      }
-
-      return (await response.json()) as T;
-    } catch (error) {
-      lastError =
-        error instanceof Error ? error : new Error("Unknown profile request failure");
-    }
-  }
-
-  throw lastError ?? new Error("No supported profile endpoint responded successfully.");
-}
-
-function asArray<T>(value: unknown): T[] {
-  if (Array.isArray(value)) return value as T[];
-
-  if (value && typeof value === "object") {
-    const objectValue = value as Record<string, unknown>;
-    const nested = [
-      objectValue.items,
-      objectValue.results,
-      objectValue.data,
-      objectValue.history,
-      objectValue.records,
-      objectValue.reminders,
-    ].find(Array.isArray);
-
-    if (Array.isArray(nested)) return nested as T[];
-  }
-
-  return [];
-}
-
 function formatDateLabel(value: unknown): string {
   if (typeof value !== "string" || !value) return "Recently";
 
@@ -185,50 +71,57 @@ function formatDateLabel(value: unknown): string {
   }).format(date);
 }
 
-function normalizeHistoryItem(rawInput: unknown): ActivityItem {
-  const raw = (rawInput ?? {}) as RawRecord;
-  const medicine = ((raw.medicine as RawRecord | undefined) ?? {}) as RawRecord;
+function buildImageUrl(rawPath: unknown): string | null {
+  const imagePath = firstNonEmptyString(rawPath);
 
-  const confidence = raw.confidence;
-  let statusLabel = "Saved";
-
-  if (typeof confidence === "number") {
-    statusLabel = confidence >= 0.8 ? "Verified" : "Pending";
-  } else if (typeof raw.match_status === "string" && raw.match_status.trim()) {
-    statusLabel = raw.match_status.trim();
-  } else if (typeof medicine.matchStatus === "string" && medicine.matchStatus.trim()) {
-    statusLabel = medicine.matchStatus.trim();
+  if (!imagePath || imagePath === "null") {
+    return null;
   }
 
+  const normalized = imagePath.replace(/\\/g, "/");
+
+  if (normalized.startsWith("http://") || normalized.startsWith("https://")) {
+    return normalized;
+  }
+
+  if (normalized.startsWith("/")) {
+    return `${env.apiBaseUrl}${normalized}`;
+  }
+
+  return `${env.apiBaseUrl}/${normalized}`;
+}
+
+function normalizeHistoryItem(rawInput: ScanHistoryItem): ActivityItem {
+  const raw = (rawInput ?? {}) as unknown as RawRecord;
+
+  const statusLabel =
+    firstNonEmptyString(raw.match_status, raw.matchStatus) ||
+    (typeof raw.ocr_confidence === "number"
+      ? raw.ocr_confidence >= 0.8
+        ? "High confidence"
+        : "Needs review"
+      : "Saved");
+
   return {
-    id: String(raw.id ?? raw.scanId ?? raw.scan_id ?? crypto.randomUUID()),
+    id: String(raw.id ?? crypto.randomUUID()),
     title:
       firstNonEmptyString(
-        raw.title,
         raw.medicine_name,
-        medicine.nameEn,
-        medicine.name_en,
-        medicine.canonicalNameZh,
-        medicine.canonical_name_zh,
-        raw.name
+        raw.title,
+        raw.name,
+        raw.barcode ? `Barcode ${raw.barcode}` : ""
       ) || "Saved medicine record",
     description:
       firstNonEmptyString(
+        raw.translated_text,
         raw.translatedSummaryEn,
-        raw.translated_summary_en,
         raw.summary,
         raw.explanation,
-        raw.note
+        raw.usage
       ) || "Saved scan result available in history.",
-    createdAtLabel: formatDateLabel(raw.created_at ?? raw.createdAt ?? raw.date),
+    createdAtLabel: formatDateLabel(raw.created_at ?? raw.createdAt),
     statusLabel,
-    imageUrl:
-      firstNonEmptyString(
-        raw.image_url,
-        raw.imageUrl,
-        raw.imagePreview,
-        raw.thumbnail_url
-      ) || null,
+    imageUrl: buildImageUrl(raw.image_path ?? raw.image_url ?? raw.imageUrl),
   };
 }
 
@@ -241,48 +134,49 @@ export default function ProfilePage() {
 
   const profileQuery = useQuery({
     queryKey: ["profile", "me"],
-    queryFn: () =>
-      requestJsonFromPaths<UserProfile>(["/users/me", "/users/me/"]),
+    queryFn: getCurrentUser,
     retry: false,
     staleTime: 60_000,
+    enabled: Boolean(storedToken),
   });
 
   const historyQuery = useQuery({
-    queryKey: ["profile", "history-preview"],
-    queryFn: () => requestJsonFromPaths<unknown>(["/history", "/history/"]),
+    queryKey: ["history"],
+    queryFn: getHistory,
     retry: false,
     staleTime: 30_000,
+    enabled: Boolean(storedToken),
   });
 
   const remindersQuery = useQuery({
-    queryKey: ["profile", "reminders-preview"],
-    queryFn: () => requestJsonFromPaths<unknown>(["/reminders", "/reminders/"]),
+    queryKey: ["reminders"],
+    queryFn: getReminders,
     retry: false,
     staleTime: 30_000,
+    enabled: Boolean(storedToken),
   });
 
   const historyItems = useMemo(
-    () => asArray<RawRecord>(historyQuery.data).map(normalizeHistoryItem).slice(0, 4),
+    () => (historyQuery.data ?? []).map(normalizeHistoryItem).slice(0, 4),
     [historyQuery.data]
   );
 
-  const reminders = useMemo(
-    () => asArray<RawRecord>(remindersQuery.data),
-    [remindersQuery.data]
-  );
+  const reminders = remindersQuery.data ?? [];
 
-  const activeReminders = reminders.filter((item) =>
-    Boolean((item as RawRecord).is_active ?? (item as RawRecord).isActive ?? true)
+  const activeReminders = reminders.filter((item: ReminderItem) =>
+    Boolean(item.is_active ?? true)
   );
 
   const trackedMedicineCount = useMemo(() => {
     const unique = new Set(
       historyItems.map((item) => item.title.toLowerCase().trim()).filter(Boolean)
     );
+
     return unique.size;
   }, [historyItems]);
 
   const profileData = profileQuery.data;
+
   const fullName =
     firstNonEmptyString(
       profileData?.full_name,
@@ -322,8 +216,8 @@ export default function ProfilePage() {
             Welcome back, {firstName}
           </h1>
           <p className="text-slate-600 max-w-xl">
-            Keep personal details visible, account access clear, and recent activity easy
-            to revisit.
+            Keep personal details visible, account access clear, and recent activity
+            easy to revisit.
           </p>
         </motion.div>
 
@@ -336,10 +230,14 @@ export default function ProfilePage() {
         </Link>
       </header>
 
-      {profileQuery.isError ? (
+      {!storedToken ? (
         <div className="rounded-[24px] border border-amber-100 bg-amber-50 px-5 py-4 text-sm text-amber-800 leading-relaxed">
-          Profile endpoint is not available in the current backend response path.
-          This screen is using session fallback data where possible.
+          You are not signed in. Log in again so profile, history, and reminders can load.
+        </div>
+      ) : profileQuery.isError ? (
+        <div className="rounded-[24px] border border-amber-100 bg-amber-50 px-5 py-4 text-sm text-amber-800 leading-relaxed">
+          Profile data could not be loaded. The page is using token fallback data where
+          possible.
         </div>
       ) : null}
 
@@ -347,7 +245,7 @@ export default function ProfilePage() {
         {[
           {
             label: "Total Scans",
-            value: historyQuery.isLoading ? "..." : String(historyItems.length),
+            value: historyQuery.isLoading ? "..." : String(historyQuery.data?.length ?? 0),
             icon: Scan,
             color: "bg-brand-primary-container/40 text-brand-on-primary-container",
           },
@@ -401,7 +299,9 @@ export default function ProfilePage() {
               <p className="text-slate-500 text-sm mb-6">{email}</p>
 
               <div className="text-left bg-slate-50 rounded-[20px] p-4 mb-4 border border-slate-100">
-                <p className="text-xs text-slate-500 mb-1 font-medium">Language preference</p>
+                <p className="text-xs text-slate-500 mb-1 font-medium">
+                  Language preference
+                </p>
                 <div className="flex justify-between items-center">
                   <p className="text-slate-900 font-medium">{languagePref}</p>
                   <Globe2 className="w-4 h-4 text-slate-400" />
@@ -466,10 +366,12 @@ export default function ProfilePage() {
                   <ShieldCheck className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="font-semibold text-slate-900 text-sm">Security status</p>
+                  <p className="font-semibold text-slate-900 text-sm">
+                    Security status
+                  </p>
                   <p className="text-sm text-slate-500 mt-1 leading-relaxed">
-                    Session handling is centralized. Password change remains deferred until the
-                    documented backend route exists.
+                    Session handling is centralized. Password change remains deferred
+                    until the documented backend route exists.
                   </p>
                 </div>
               </div>
@@ -541,7 +443,9 @@ export default function ProfilePage() {
                         {item.createdAtLabel}
                       </span>
                     </div>
-                    <p className="text-sm text-slate-500 truncate">{item.description}</p>
+                    <p className="text-sm text-slate-500 truncate">
+                      {item.description}
+                    </p>
                   </div>
 
                   <div className="px-3 py-1 rounded-full text-[10px] font-bold uppercase bg-brand-primary-container/40 text-brand-on-primary-container">
@@ -555,9 +459,9 @@ export default function ProfilePage() {
       </div>
 
       <div className="text-xs text-slate-500 leading-relaxed max-w-3xl">
-        This page reads profile data from <code>GET /users/me</code> when available and falls
-        back to session/token data when the profile endpoint is not mounted yet. Recent activity
-        is derived from history and reminder counts only if those endpoints are currently reachable.
+        This profile page now reads from the shared API client:
+        <code> GET /users/me</code>, <code>GET /history/</code>, and
+        <code> GET /reminders/</code>.
       </div>
     </div>
   );

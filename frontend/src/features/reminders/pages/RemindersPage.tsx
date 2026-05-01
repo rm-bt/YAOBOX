@@ -14,14 +14,16 @@ import {
   TriangleAlert,
 } from "lucide-react";
 
-const API_BASE_URL =
-  (import.meta as ImportMeta & {
-    env?: { VITE_API_BASE_URL?: string };
-  }).env?.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
+import {
+  createReminder,
+  deleteReminder,
+  getReminders,
+  updateReminder,
+  type ReminderCreatePayload,
+  type ReminderItem,
+} from "../../../api/reminders.api";
 
-type RawRecord = Record<string, unknown>;
-
-type ReminderItem = {
+type NormalizedReminder = {
   id: string;
   title: string;
   medicineId: string;
@@ -34,6 +36,7 @@ type ReminderItem = {
 
 type ReminderFormState = {
   medicineId: string;
+  medicineName: string;
   reminderTime: string;
   frequency: string;
   dosageNote: string;
@@ -44,102 +47,8 @@ function firstNonEmptyString(...values: unknown[]): string {
   for (const value of values) {
     if (typeof value === "string" && value.trim()) return value.trim();
   }
+
   return "";
-}
-
-function getStoredToken(): string | null {
-  const directKeys = [
-    "yaobox_access_token",
-    "access_token",
-    "token",
-    "auth_token",
-    "yaobox_token",
-  ];
-
-  for (const key of directKeys) {
-    const value = window.localStorage.getItem(key);
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-
-  const jsonKeys = ["session", "auth", "auth-storage", "yaobox-auth"];
-
-  for (const key of jsonKeys) {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) continue;
-
-    try {
-      const parsed = JSON.parse(raw) as Record<string, unknown>;
-      const candidates = [
-        parsed.access_token,
-        parsed.token,
-        (parsed.session as Record<string, unknown> | undefined)?.access_token,
-        (parsed.session as Record<string, unknown> | undefined)?.token,
-        (parsed.state as Record<string, unknown> | undefined)?.access_token,
-        (parsed.state as Record<string, unknown> | undefined)?.token,
-        (
-          (parsed.state as Record<string, unknown> | undefined)
-            ?.session as Record<string, unknown> | undefined
-        )?.access_token,
-        (
-          (parsed.state as Record<string, unknown> | undefined)
-            ?.session as Record<string, unknown> | undefined
-        )?.token,
-      ];
-
-      const found = candidates.find(
-        (value): value is string => typeof value === "string" && value.length > 0
-      );
-
-      if (found) return found;
-    } catch {
-      // ignore malformed values
-    }
-  }
-
-  return null;
-}
-
-async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getStoredToken();
-
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      Accept: "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `Request failed for ${path} with status ${response.status}`);
-  }
-
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return (await response.json()) as T;
-}
-
-function asArray<T>(value: unknown): T[] {
-  if (Array.isArray(value)) return value as T[];
-
-  if (value && typeof value === "object") {
-    const objectValue = value as Record<string, unknown>;
-    const nested = [
-      objectValue.items,
-      objectValue.results,
-      objectValue.data,
-      objectValue.reminders,
-      objectValue.records,
-    ].find(Array.isArray);
-
-    if (Array.isArray(nested)) return nested as T[];
-  }
-
-  return [];
 }
 
 function formatTimeLabel(value: unknown): string {
@@ -173,16 +82,8 @@ function isDueToday(value: string): boolean {
   );
 }
 
-function normalizeReminder(raw: RawRecord): ReminderItem {
-  const medicine = ((raw.medicine as RawRecord | undefined) ?? {}) as RawRecord;
-
-  const reminderTimeRaw = firstNonEmptyString(
-    raw.reminder_time,
-    raw.remind_time,
-    raw.reminderTime,
-    raw.remindTime,
-    raw.time
-  );
+function normalizeReminder(raw: ReminderItem): NormalizedReminder {
+  const reminderTimeRaw = firstNonEmptyString(raw.reminder_time);
 
   const medicineId =
     typeof raw.medicine_id === "number"
@@ -190,30 +91,19 @@ function normalizeReminder(raw: RawRecord): ReminderItem {
       : firstNonEmptyString(raw.medicine_id);
 
   return {
-    id: String(raw.id ?? crypto.randomUUID()),
-    title:
-      firstNonEmptyString(
-        raw.title,
-        raw.medicine_name,
-        raw.medicineName,
-        medicine.nameEn,
-        medicine.name_en,
-        medicine.canonicalNameZh,
-        medicine.canonical_name_zh
-      ) || "Medication reminder",
+    id: String(raw.id),
+    title: firstNonEmptyString(raw.medicine_name) || "Medication reminder",
     medicineId,
     reminderTimeRaw,
     reminderTimeText: formatTimeLabel(reminderTimeRaw),
-    frequency:
-      firstNonEmptyString(raw.frequency, raw.repeat, raw.schedule) || "daily",
-    dosageNote:
-      firstNonEmptyString(raw.dosage_note, raw.dosage, raw.note) || "No dosage note",
-    isActive: Boolean(raw.is_active ?? raw.isActive ?? true),
+    frequency: firstNonEmptyString(raw.frequency) || "daily",
+    dosageNote: firstNonEmptyString(raw.dosage_note) || "No dosage note",
+    isActive: Boolean(raw.is_active ?? true),
   };
 }
 
-function buildCreatePayload(form: ReminderFormState): Record<string, unknown> {
-  const payload: Record<string, unknown> = {
+function buildCreatePayload(form: ReminderFormState): ReminderCreatePayload {
+  const payload: ReminderCreatePayload = {
     reminder_time: form.reminderTime,
     frequency: form.frequency,
     dosage_note: form.dosageNote,
@@ -221,8 +111,14 @@ function buildCreatePayload(form: ReminderFormState): Record<string, unknown> {
   };
 
   const cleanMedicineId = form.medicineId.trim();
+  const cleanMedicineName = form.medicineName.trim();
+
   if (cleanMedicineId) {
     payload.medicine_id = cleanMedicineId;
+  }
+
+  if (cleanMedicineName) {
+    payload.medicine_name = cleanMedicineName;
   }
 
   return payload;
@@ -255,43 +151,36 @@ const StatCard = ({
 
 export default function RemindersPage() {
   const queryClient = useQueryClient();
-  const authToken = getStoredToken();
 
   const [form, setForm] = useState<ReminderFormState>({
     medicineId: "",
+    medicineName: "",
     reminderTime: "",
     frequency: "daily",
     dosageNote: "",
     isActive: true,
   });
+
   const [activeMutationId, setActiveMutationId] = useState<string | null>(null);
 
   const remindersQuery = useQuery({
     queryKey: ["reminders"],
-    queryFn: () => requestJson<unknown>("/reminders/"),
+    queryFn: getReminders,
     staleTime: 10_000,
     retry: false,
-    enabled: Boolean(authToken),
     refetchOnWindowFocus: false,
   });
 
-  const createReminder = useMutation({
-    mutationFn: async (payload: Record<string, unknown>) =>
-      requestJson<unknown>("/reminders/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      }),
+  const createReminderMutation = useMutation({
+    mutationFn: createReminder,
     onMutate: () => {
       setActiveMutationId("create");
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["reminders"] });
-      await queryClient.refetchQueries({ queryKey: ["reminders"], exact: true });
       setForm({
         medicineId: "",
+        medicineName: "",
         reminderTime: "",
         frequency: "daily",
         dosageNote: "",
@@ -303,44 +192,32 @@ export default function RemindersPage() {
     },
   });
 
-  const updateReminder = useMutation({
-    mutationFn: async ({
+  const updateReminderMutation = useMutation({
+    mutationFn: ({
       id,
       payload,
     }: {
       id: string;
-      payload: Record<string, unknown>;
-    }) =>
-      requestJson<unknown>(`/reminders/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      }),
+      payload: ReminderCreatePayload;
+    }) => updateReminder(id, payload),
     onMutate: ({ id }) => {
       setActiveMutationId(id);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["reminders"] });
-      await queryClient.refetchQueries({ queryKey: ["reminders"], exact: true });
     },
     onSettled: () => {
       setActiveMutationId(null);
     },
   });
 
-  const deleteReminder = useMutation({
-    mutationFn: async (id: string) =>
-      requestJson<unknown>(`/reminders/${id}`, {
-        method: "DELETE",
-      }),
+  const deleteReminderMutation = useMutation({
+    mutationFn: deleteReminder,
     onMutate: (id) => {
-      setActiveMutationId(id);
+      setActiveMutationId(String(id));
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["reminders"] });
-      await queryClient.refetchQueries({ queryKey: ["reminders"], exact: true });
     },
     onSettled: () => {
       setActiveMutationId(null);
@@ -348,7 +225,7 @@ export default function RemindersPage() {
   });
 
   const reminders = useMemo(
-    () => asArray<RawRecord>(remindersQuery.data).map(normalizeReminder),
+    () => (remindersQuery.data ?? []).map(normalizeReminder),
     [remindersQuery.data]
   );
 
@@ -373,7 +250,9 @@ export default function RemindersPage() {
   );
 
   const isAnyMutationPending =
-    createReminder.isPending || updateReminder.isPending || deleteReminder.isPending;
+    createReminderMutation.isPending ||
+    updateReminderMutation.isPending ||
+    deleteReminderMutation.isPending;
 
   function handleCreateSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -382,23 +261,25 @@ export default function RemindersPage() {
       return;
     }
 
-    createReminder.reset();
-    updateReminder.reset();
-    deleteReminder.reset();
-    createReminder.mutate(buildCreatePayload(form));
+    createReminderMutation.reset();
+    updateReminderMutation.reset();
+    deleteReminderMutation.reset();
+
+    createReminderMutation.mutate(buildCreatePayload(form));
   }
 
-  function handleToggleActive(item: ReminderItem) {
+  function handleToggleActive(item: NormalizedReminder) {
     const freshItem = reminderById.get(item.id);
+
     if (!freshItem || isAnyMutationPending) {
       return;
     }
 
-    createReminder.reset();
-    updateReminder.reset();
-    deleteReminder.reset();
+    createReminderMutation.reset();
+    updateReminderMutation.reset();
+    deleteReminderMutation.reset();
 
-    updateReminder.mutate({
+    updateReminderMutation.mutate({
       id: freshItem.id,
       payload: {
         reminder_time: freshItem.reminderTimeRaw,
@@ -417,10 +298,11 @@ export default function RemindersPage() {
       return;
     }
 
-    createReminder.reset();
-    updateReminder.reset();
-    deleteReminder.reset();
-    deleteReminder.mutate(itemId);
+    createReminderMutation.reset();
+    updateReminderMutation.reset();
+    deleteReminderMutation.reset();
+
+    deleteReminderMutation.mutate(itemId);
   }
 
   return (
@@ -435,8 +317,8 @@ export default function RemindersPage() {
         </h1>
 
         <p className="text-lg text-slate-600 max-w-3xl leading-relaxed">
-          Keep reminder setup simple. This page should help users create, review,
-          activate, and remove schedules without friction.
+          Keep reminder setup simple. Create, review, activate, and remove schedules
+          without turning reminders into a fake clinical system.
         </p>
 
         <div className="inline-flex items-center gap-2 rounded-full bg-brand-primary-container/40 px-4 py-2 text-sm font-semibold text-brand-on-primary-container">
@@ -481,7 +363,7 @@ export default function RemindersPage() {
             <div>
               <h2 className="text-xl font-bold text-slate-900">Create reminder</h2>
               <p className="text-sm text-slate-500">
-                Use the backend reminder contract directly.
+                Saved through the shared backend reminder API.
               </p>
             </div>
           </div>
@@ -489,7 +371,25 @@ export default function RemindersPage() {
           <form className="space-y-5" onSubmit={handleCreateSubmit}>
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-800">
-                Medicine ID (optional)
+                Medicine name
+              </label>
+              <input
+                type="text"
+                value={form.medicineName}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    medicineName: event.target.value,
+                  }))
+                }
+                placeholder="Medicine name"
+                className="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-800">
+                Medicine ID optional
               </label>
               <input
                 type="text"
@@ -500,7 +400,7 @@ export default function RemindersPage() {
                     medicineId: event.target.value,
                   }))
                 }
-                placeholder="Leave blank unless you know the linked medicine id"
+                placeholder="Leave blank unless linked to catalog"
                 className="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10"
               />
             </div>
@@ -579,15 +479,15 @@ export default function RemindersPage() {
               </span>
             </label>
 
-            {createReminder.isError ? (
+            {createReminderMutation.isError ? (
               <div className="rounded-[20px] bg-red-50 border border-red-100 px-4 py-4 text-sm text-red-700 leading-relaxed whitespace-pre-wrap break-words">
-                {createReminder.error instanceof Error
-                  ? createReminder.error.message
-                  : "Reminder creation failed. Check the backend response and submitted fields."}
+                {createReminderMutation.error instanceof Error
+                  ? createReminderMutation.error.message
+                  : "Reminder creation failed."}
               </div>
             ) : null}
 
-            {createReminder.isSuccess ? (
+            {createReminderMutation.isSuccess ? (
               <div className="rounded-[20px] bg-emerald-50 border border-emerald-100 px-4 py-4 text-sm text-emerald-700 leading-relaxed flex items-start gap-2">
                 <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
                 <span>Reminder created successfully.</span>
@@ -596,10 +496,12 @@ export default function RemindersPage() {
 
             <button
               type="submit"
-              disabled={createReminder.isPending || isAnyMutationPending}
+              disabled={createReminderMutation.isPending || isAnyMutationPending}
               className="w-full rounded-full bg-brand-secondary px-6 py-4 text-white font-bold shadow-lg shadow-brand-secondary/20 transition-all hover:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {createReminder.isPending ? "Creating reminder..." : "Create reminder"}
+              {createReminderMutation.isPending
+                ? "Creating reminder..."
+                : "Create reminder"}
             </button>
           </form>
         </div>
@@ -608,7 +510,9 @@ export default function RemindersPage() {
           <div className="bg-white rounded-[28px] border border-slate-100 p-6 shadow-sm">
             <div className="flex items-center justify-between gap-4 mb-5">
               <div>
-                <h2 className="text-xl font-bold text-slate-900">Active reminders</h2>
+                <h2 className="text-xl font-bold text-slate-900">
+                  Active reminders
+                </h2>
                 <p className="text-sm text-slate-500">
                   Simple schedule display, honest status, clean controls.
                 </p>
@@ -632,9 +536,7 @@ export default function RemindersPage() {
             ) : remindersQuery.isError ? (
               <div className="rounded-[22px] bg-amber-50 border border-amber-100 px-4 py-4 text-sm text-amber-800 leading-relaxed flex items-start gap-3">
                 <TriangleAlert className="w-4 h-4 mt-0.5 shrink-0" />
-                <div>
-                  Reminder data could not be loaded from <code>/reminders/</code>.
-                </div>
+                <div>Reminder data could not be loaded from the backend.</div>
               </div>
             ) : activeReminders.length === 0 ? (
               <div className="rounded-[22px] bg-slate-50 border border-slate-100 px-4 py-5 text-sm text-slate-600 leading-relaxed">
@@ -644,6 +546,7 @@ export default function RemindersPage() {
               <div className="space-y-4">
                 {activeReminders.map((item) => {
                   const isBusy = activeMutationId === item.id;
+
                   return (
                     <motion.div
                       key={item.id}
@@ -653,13 +556,17 @@ export default function RemindersPage() {
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-bold text-slate-900 text-lg">{item.title}</p>
+                            <p className="font-bold text-slate-900 text-lg">
+                              {item.title}
+                            </p>
                             <span className="rounded-full bg-brand-primary-container/40 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-brand-on-primary-container">
                               {item.frequency}
                             </span>
                           </div>
 
-                          <p className="mt-2 text-sm text-slate-600">{item.dosageNote}</p>
+                          <p className="mt-2 text-sm text-slate-600">
+                            {item.dosageNote}
+                          </p>
 
                           <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-slate-500">
                             <span className="inline-flex items-center gap-1">
@@ -689,7 +596,7 @@ export default function RemindersPage() {
                             disabled={isAnyMutationPending || isBusy}
                             className="rounded-full bg-white border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-60"
                           >
-                            {isBusy && updateReminder.isPending
+                            {isBusy && updateReminderMutation.isPending
                               ? "Updating..."
                               : "Deactivate"}
                           </button>
@@ -701,7 +608,9 @@ export default function RemindersPage() {
                             className="rounded-full bg-red-50 border border-red-100 px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-100 transition-colors disabled:opacity-60 inline-flex items-center justify-center gap-1"
                           >
                             <Trash2 size={12} />
-                            {isBusy && deleteReminder.isPending ? "Deleting..." : "Delete"}
+                            {isBusy && deleteReminderMutation.isPending
+                              ? "Deleting..."
+                              : "Delete"}
                           </button>
                         </div>
                       </div>
@@ -715,9 +624,11 @@ export default function RemindersPage() {
           <div className="bg-white rounded-[28px] border border-slate-100 p-6 shadow-sm">
             <div className="flex items-center justify-between gap-4 mb-5">
               <div>
-                <h2 className="text-xl font-bold text-slate-900">Inactive reminders</h2>
+                <h2 className="text-xl font-bold text-slate-900">
+                  Inactive reminders
+                </h2>
                 <p className="text-sm text-slate-500">
-                  Keep inactive reminders visible. Never hide unsaved or disabled states.
+                  Disabled reminders stay visible so users understand their state.
                 </p>
               </div>
             </div>
@@ -730,6 +641,7 @@ export default function RemindersPage() {
               <div className="space-y-3">
                 {inactiveReminders.map((item) => {
                   const isBusy = activeMutationId === item.id;
+
                   return (
                     <div
                       key={item.id}
@@ -738,7 +650,9 @@ export default function RemindersPage() {
                       <div className="flex items-center justify-between gap-4">
                         <div>
                           <p className="font-bold text-slate-900">{item.title}</p>
-                          <p className="text-sm text-slate-600 mt-1">{item.dosageNote}</p>
+                          <p className="text-sm text-slate-600 mt-1">
+                            {item.dosageNote}
+                          </p>
                         </div>
 
                         <button
@@ -747,7 +661,9 @@ export default function RemindersPage() {
                           disabled={isAnyMutationPending || isBusy}
                           className="rounded-full bg-brand-primary-container/40 px-4 py-2 text-xs font-bold text-brand-on-primary-container hover:brightness-95 transition-all disabled:opacity-60"
                         >
-                          {isBusy && updateReminder.isPending ? "Updating..." : "Activate"}
+                          {isBusy && updateReminderMutation.isPending
+                            ? "Updating..."
+                            : "Activate"}
                         </button>
                       </div>
                     </div>
@@ -757,12 +673,12 @@ export default function RemindersPage() {
             )}
           </div>
 
-          {(updateReminder.isError || deleteReminder.isError) ? (
+          {updateReminderMutation.isError || deleteReminderMutation.isError ? (
             <div className="rounded-[22px] bg-red-50 border border-red-100 px-4 py-4 text-sm text-red-700 leading-relaxed">
-              {updateReminder.error instanceof Error
-                ? updateReminder.error.message
-                : deleteReminder.error instanceof Error
-                  ? deleteReminder.error.message
+              {updateReminderMutation.error instanceof Error
+                ? updateReminderMutation.error.message
+                : deleteReminderMutation.error instanceof Error
+                  ? deleteReminderMutation.error.message
                   : "Reminder update failed."}
             </div>
           ) : null}
@@ -770,9 +686,10 @@ export default function RemindersPage() {
       </section>
 
       <div className="text-xs text-slate-500 leading-relaxed max-w-3xl">
-        This page is wired to the backend reminder routes already defined in the
-        project: <code>GET /reminders/</code>, <code>POST /reminders/</code>,
-        <code>PUT /reminders/{"{id}"}</code>, and <code>DELETE /reminders/{"{id}"}</code>.
+        This page is wired through the shared reminder API wrapper:
+        <code> GET /reminders/</code>, <code>POST /reminders/</code>,
+        <code> PUT /reminders/{"{id}"}</code>, and
+        <code> DELETE /reminders/{"{id}"}</code>.
       </div>
     </div>
   );

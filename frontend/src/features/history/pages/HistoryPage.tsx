@@ -5,7 +5,6 @@ import { motion } from "motion/react";
 import {
   CalendarDays,
   ChevronRight,
-  Clock3,
   FileText,
   Loader2,
   Pill,
@@ -15,12 +14,13 @@ import {
   TriangleAlert,
 } from "lucide-react";
 
-const API_BASE_URL =
-  (import.meta as ImportMeta & {
-    env?: { VITE_API_BASE_URL?: string };
-  }).env?.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
+import { env } from "../../../app/config/env";
+import {
+  deleteHistoryItem,
+  getHistory,
+  type ScanHistoryItem,
+} from "../../../api/history.api";
 
-type RawRecord = Record<string, unknown>;
 type HistoryFilter = "all" | "medicine" | "prescription" | "report";
 
 type HistoryItem = {
@@ -28,7 +28,6 @@ type HistoryItem = {
   title: string;
   recordType: "medicine" | "prescription" | "report";
   sourceType: string;
-  createdAtRaw: string;
   createdAtLabel: string;
   confidenceValue: number | null;
   confidenceLabel: string;
@@ -39,12 +38,14 @@ type HistoryItem = {
   imageUrl: string | null;
   barcode: string;
   matchStatus: string;
+  trustNotes: string;
 };
 
 function firstNonEmptyString(...values: unknown[]): string {
   for (const value of values) {
     if (typeof value === "string" && value.trim()) return value.trim();
   }
+
   return "";
 }
 
@@ -57,111 +58,6 @@ function asWarningList(value: unknown): string[] {
 
   const single = firstNonEmptyString(value);
   return single ? [single] : [];
-}
-
-function getStoredToken(): string | null {
-  const directKeys = [
-    "yaobox_access_token",
-    "access_token",
-    "token",
-    "auth_token",
-    "yaobox_token",
-  ];
-
-  for (const key of directKeys) {
-    const value = window.localStorage.getItem(key);
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-
-  const jsonKeys = ["session", "auth", "auth-storage", "yaobox-auth"];
-
-  for (const key of jsonKeys) {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) continue;
-
-    try {
-      const parsed = JSON.parse(raw) as Record<string, unknown>;
-      const candidates = [
-        parsed.access_token,
-        parsed.token,
-        (parsed.session as Record<string, unknown> | undefined)?.access_token,
-        (parsed.session as Record<string, unknown> | undefined)?.token,
-        (parsed.state as Record<string, unknown> | undefined)?.access_token,
-        (parsed.state as Record<string, unknown> | undefined)?.token,
-      ];
-
-      for (const candidate of candidates) {
-        if (typeof candidate === "string" && candidate.trim()) {
-          return candidate.trim();
-        }
-      }
-    } catch {
-      // ignore malformed storage
-    }
-  }
-
-  return null;
-}
-
-async function requestJsonFromPaths<T>(
-  paths: string[],
-  init?: RequestInit
-): Promise<T> {
-  const token = getStoredToken();
-  let lastError: Error | null = null;
-
-  for (const path of paths) {
-    try {
-      const response = await fetch(`${API_BASE_URL}${path}`, {
-        ...init,
-        headers: {
-          Accept: "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          ...(init?.headers ?? {}),
-        },
-      });
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          continue;
-        }
-
-        const text = await response.text();
-        throw new Error(text || `Request failed for ${path} with status ${response.status}`);
-      }
-
-      if (response.status === 204) {
-        return undefined as T;
-      }
-
-      return (await response.json()) as T;
-    } catch (error) {
-      lastError =
-        error instanceof Error ? error : new Error("Unknown history request failure");
-    }
-  }
-
-  throw lastError ?? new Error("No history endpoint responded successfully.");
-}
-
-function asArray<T>(value: unknown): T[] {
-  if (Array.isArray(value)) return value as T[];
-
-  if (value && typeof value === "object") {
-    const objectValue = value as Record<string, unknown>;
-    const nested = [
-      objectValue.items,
-      objectValue.results,
-      objectValue.data,
-      objectValue.history,
-      objectValue.records,
-      objectValue.scan_history,
-    ].find(Array.isArray);
-
-    if (Array.isArray(nested)) return nested as T[];
-  }
-
-  return [];
 }
 
 function formatDateLabel(value: unknown): string {
@@ -179,29 +75,30 @@ function formatDateLabel(value: unknown): string {
   }).format(date);
 }
 
-function normalizeConfidenceLabel(raw: RawRecord): {
+function buildImageUrl(rawPath: unknown): string | null {
+  const imagePath = firstNonEmptyString(rawPath);
+
+  if (!imagePath || imagePath === "null") {
+    return null;
+  }
+
+  const normalized = imagePath.replace(/\\/g, "/");
+
+  if (normalized.startsWith("http://") || normalized.startsWith("https://")) {
+    return normalized;
+  }
+
+  if (normalized.startsWith("/")) {
+    return `${env.apiBaseUrl}${normalized}`;
+  }
+
+  return `${env.apiBaseUrl}/${normalized}`;
+}
+
+function normalizeConfidenceLabel(raw: ScanHistoryItem): {
   confidenceValue: number | null;
   confidenceLabel: string;
 } {
-  const confidence = raw.confidence;
-
-  if (typeof confidence === "number") {
-    return {
-      confidenceValue: confidence,
-      confidenceLabel: `${Math.round(confidence * 100)}% confidence`,
-    };
-  }
-
-  if (confidence && typeof confidence === "object") {
-    const obj = confidence as RawRecord;
-    if (typeof obj.ocr === "number") {
-      return {
-        confidenceValue: obj.ocr,
-        confidenceLabel: `${Math.round(obj.ocr * 100)}% OCR`,
-      };
-    }
-  }
-
   if (typeof raw.ocr_confidence === "number") {
     return {
       confidenceValue: raw.ocr_confidence,
@@ -215,92 +112,51 @@ function normalizeConfidenceLabel(raw: RawRecord): {
   };
 }
 
-function inferRecordType(raw: RawRecord): "medicine" | "prescription" | "report" {
-  const explicit = firstNonEmptyString(
-    raw.record_type,
-    raw.document_type,
-    raw.type,
-    raw.sourceType,
-    raw.source_type
-  ).toLowerCase();
+function inferRecordType(
+  raw: ScanHistoryItem
+): "medicine" | "prescription" | "report" {
+  const sourceType = firstNonEmptyString(raw.source_type).toLowerCase();
+  const title = firstNonEmptyString(raw.medicine_name).toLowerCase();
 
-  if (explicit.includes("prescription")) return "prescription";
-  if (explicit.includes("report")) return "report";
-  if (explicit.includes("barcode")) return "medicine";
-  if (explicit.includes("image_upload")) return "medicine";
-
-  const title = firstNonEmptyString(raw.title, raw.name, raw.medicine_name).toLowerCase();
+  if (sourceType.includes("prescription")) return "prescription";
+  if (sourceType.includes("report")) return "report";
   if (title.includes("prescription")) return "prescription";
   if (title.includes("report")) return "report";
 
   return "medicine";
 }
 
-function normalizeHistoryItem(rawInput: unknown): HistoryItem {
-  const raw = (rawInput ?? {}) as RawRecord;
-  const medicine = ((raw.medicine as RawRecord | undefined) ?? {}) as RawRecord;
+function normalizeHistoryItem(raw: ScanHistoryItem): HistoryItem {
   const confidence = normalizeConfidenceLabel(raw);
 
   return {
-    id: String(raw.id ?? raw.scanId ?? raw.scan_id ?? crypto.randomUUID()),
+    id: String(raw.id),
     title:
       firstNonEmptyString(
-        raw.title,
         raw.medicine_name,
-        medicine.nameEn,
-        medicine.name_en,
-        medicine.canonicalNameZh,
-        medicine.canonical_name_zh,
-        raw.name
+        raw.barcode ? `Barcode ${raw.barcode}` : ""
       ) || "Saved history record",
     recordType: inferRecordType(raw),
-    sourceType:
-      firstNonEmptyString(raw.sourceType, raw.source_type) || "unknown",
-    createdAtRaw: firstNonEmptyString(raw.created_at, raw.createdAt, raw.date),
-    createdAtLabel: formatDateLabel(raw.created_at ?? raw.createdAt ?? raw.date),
+    sourceType: firstNonEmptyString(raw.source_type) || "unknown",
+    createdAtLabel: formatDateLabel(raw.created_at),
     confidenceValue: confidence.confidenceValue,
     confidenceLabel: confidence.confidenceLabel,
     translatedSummary:
-      firstNonEmptyString(
-        raw.translatedSummaryEn,
-        raw.translated_summary_en,
-        raw.translated_text,
-        raw.summary,
-        raw.explanation
-      ) || "English explanation not available.",
+      firstNonEmptyString(raw.translated_text, raw.usage) ||
+      "English explanation not available.",
     extractedText:
-      firstNonEmptyString(
-        raw.extractedTextZh,
-        raw.extracted_text_zh,
-        raw.raw_text,
-        raw.ocr_text,
-        raw.original_text
-      ) || "Original extracted text not available.",
+      firstNonEmptyString(raw.raw_ocr_text) ||
+      "Original extracted text not available.",
     dosage:
-      firstNonEmptyString(
-        raw.dosage,
-        medicine.dosage_text,
-        medicine.dosageText,
-        raw.usage,
-        raw.instructions
-      ) || "Dosage not extracted clearly.",
-    warnings: [
-      ...asWarningList(raw.warnings),
-      ...asWarningList(raw.warning),
-      ...asWarningList(medicine.warnings),
-    ].filter(Boolean),
-    imageUrl:
-      firstNonEmptyString(
-        raw.image_url,
-        raw.imageUrl,
-        raw.imagePreview,
-        raw.thumbnail_url
-      ) || null,
-    barcode:
-      firstNonEmptyString(raw.barcode, medicine.barcode) || "Not available",
-    matchStatus:
-      firstNonEmptyString(raw.match_status, raw.matchStatus, medicine.matchStatus) ||
-      "unknown",
+      firstNonEmptyString(raw.dosage, raw.usage) ||
+      "Dosage not extracted clearly.",
+    warnings: asWarningList(raw.warnings),
+    imageUrl: buildImageUrl(raw.image_path),
+    barcode: firstNonEmptyString(raw.barcode) || "Not available",
+    matchStatus: firstNonEmptyString(raw.match_status) || "unknown",
+    trustNotes:
+      firstNonEmptyString(raw.trust_notes) ||
+      "No trust notes were returned by the backend.",
   };
 }
 
@@ -314,9 +170,11 @@ function typeChipClass(recordType: HistoryItem["recordType"]): string {
   if (recordType === "prescription") {
     return "bg-brand-primary-container/50 text-brand-on-primary-container";
   }
+
   if (recordType === "report") {
     return "bg-brand-tertiary-container/40 text-brand-tertiary";
   }
+
   return "bg-slate-100 text-slate-700";
 }
 
@@ -336,17 +194,13 @@ export default function HistoryPage() {
 
   const historyQuery = useQuery({
     queryKey: ["history"],
-    queryFn: () => requestJsonFromPaths<unknown>(["/history", "/history/"]),
+    queryFn: getHistory,
     retry: false,
     staleTime: 30_000,
   });
 
   const deleteHistory = useMutation({
-    mutationFn: async (scanId: string) =>
-      requestJsonFromPaths<unknown>(
-        [`/history/${scanId}`, `/history/${scanId}/`],
-        { method: "DELETE" }
-      ),
+    mutationFn: deleteHistoryItem,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["history"] });
       setSelectedId(null);
@@ -354,7 +208,7 @@ export default function HistoryPage() {
   });
 
   const historyItems = useMemo(
-    () => asArray<RawRecord>(historyQuery.data).map(normalizeHistoryItem),
+    () => (historyQuery.data ?? []).map(normalizeHistoryItem),
     [historyQuery.data]
   );
 
@@ -372,7 +226,6 @@ export default function HistoryPage() {
         activeFilter === "all" ? true : item.recordType === activeFilter;
 
       if (!filterMatch) return false;
-
       if (!query) return true;
 
       return [
@@ -381,6 +234,7 @@ export default function HistoryPage() {
         item.dosage,
         item.sourceType,
         item.matchStatus,
+        item.trustNotes,
       ]
         .join(" ")
         .toLowerCase()
@@ -410,14 +264,14 @@ export default function HistoryPage() {
               Scan history
             </h1>
             <p className="text-lg text-slate-600 max-w-3xl leading-relaxed mt-3">
-              Reopen prior scan results fast. Keep the list skim-friendly, searchable,
-              and honest about source and confidence.
+              Reopen prior scan results fast. Keep the list searchable and honest
+              about source, confidence, OCR text, and AI explanation.
             </p>
           </div>
 
           <div className="inline-flex items-center gap-2 rounded-full bg-brand-primary-container/40 px-4 py-2 text-sm font-semibold text-brand-on-primary-container">
             <ShieldCheck size={16} />
-            History should reflect verified data, OCR text, and AI explanation separately.
+            History reflects saved scan records from the backend.
           </div>
         </div>
       </header>
@@ -441,7 +295,9 @@ export default function HistoryPage() {
           <div className="text-3xl font-bold text-slate-900">
             {historyQuery.isLoading ? "..." : String(lowConfidenceCount)}
           </div>
-          <div className="text-slate-500 font-medium mt-2">Low-confidence records</div>
+          <div className="text-slate-500 font-medium mt-2">
+            Low-confidence records
+          </div>
         </div>
       </section>
 
@@ -497,17 +353,14 @@ export default function HistoryPage() {
           <div className="space-y-2">
             <p className="font-semibold">History could not be loaded.</p>
             <p className="text-sm leading-relaxed">
-              The frontend is calling the intended history endpoint, but your running
-              backend may not have the route mounted yet, or the session may be invalid.
+              Check that you are logged in and that the backend is running.
             </p>
-            <div className="flex flex-wrap gap-3 pt-2">
-              <Link
-                to="/scan"
-                className="rounded-full bg-brand-secondary px-5 py-3 text-white font-bold shadow-lg shadow-brand-secondary/20 hover:brightness-95 transition-all"
-              >
-                Go to scan
-              </Link>
-            </div>
+            <Link
+              to="/scan"
+              className="inline-flex rounded-full bg-brand-secondary px-5 py-3 text-white font-bold shadow-lg shadow-brand-secondary/20 hover:brightness-95 transition-all"
+            >
+              Go to scan
+            </Link>
           </div>
         </section>
       ) : filteredItems.length === 0 ? (
@@ -517,8 +370,7 @@ export default function HistoryPage() {
             No history records found
           </h2>
           <p className="text-slate-600 max-w-2xl mx-auto mt-3 leading-relaxed">
-            This history view stays useful only when saved scan results exist. Start
-            from the scan flow, save a result, then return here.
+            Scan a medicine or prescription first, then return here.
           </p>
           <div className="mt-6">
             <Link
@@ -615,7 +467,9 @@ export default function HistoryPage() {
                     <h2 className="text-3xl font-bold text-slate-900">
                       {selectedItem.title}
                     </h2>
-                    <p className="text-slate-500 mt-2">{selectedItem.createdAtLabel}</p>
+                    <p className="text-slate-500 mt-2">
+                      {selectedItem.createdAtLabel}
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -642,7 +496,7 @@ export default function HistoryPage() {
                     <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500 mb-2">
                       English explanation
                     </p>
-                    <p className="text-slate-900 leading-relaxed">
+                    <p className="text-slate-900 leading-relaxed whitespace-pre-wrap">
                       {selectedItem.translatedSummary}
                     </p>
                   </div>
@@ -653,6 +507,15 @@ export default function HistoryPage() {
                     </p>
                     <p className="text-slate-700 leading-relaxed whitespace-pre-wrap text-sm">
                       {selectedItem.extractedText}
+                    </p>
+                  </div>
+
+                  <div className="rounded-[24px] bg-slate-50 px-5 py-5">
+                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500 mb-2">
+                      Trust notes
+                    </p>
+                    <p className="text-slate-700 leading-relaxed text-sm">
+                      {selectedItem.trustNotes}
                     </p>
                   </div>
 
