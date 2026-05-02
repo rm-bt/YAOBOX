@@ -1,0 +1,58 @@
+[
+  {
+    "canonical_name_en": "Shuanghuanglian Oral Liquid",
+    "canonical_name_zh": "\u53cc\u9ec4\u8fde\u53e3\u670d\u6db2",
+    "barcode": null,
+    "manufacturer": "\u5b89\u5fbd\u4e5d\u5dde\u65b9\u5706\u5236\u836f\u6709\u9650\u516c\u53f8",
+    "manufacturer_en": "Anhui Jiuzhou Fangyuan Pharmaceutical Co., Ltd.",
+    "usage": "\u7528\u4e8e\u5916\u611f\u98ce\u70ed\u6240\u81f4\u7684\u611f\u5192\uff0c\u75c7\u89c1\u53d1\u70ed\u3001\u54b3\u55fd\u3001\u54bd\u75db\u3002",
+    "usage_en": "Used for wind-heat common cold symptoms such as fever, cough, and sore throat.",
+    "dosage": "10\u652f",
+    "warnings": "\u8bf7\u4ed4\u7ec6\u9605\u8bfb\u8bf4\u660e\u4e66\u5e76\u6309\u8bf4\u660e\u4f7f\u7528\u6216\u5728\u836f\u5e08\u6307\u5bfc\u4e0b\u8d2d\u4e70\u548c\u4f7f\u7528\u3002",
+    "warnings_en": "Read the package instructions carefully and use only as directed or under pharmacist guidance.",
+    "aliases": "\u53cc\u9ec4\u8fde;\u53cc\u9ec4\u8fde\u53e3\u670d\u6db2;Shuanghuanglian;Shuanghuanglian Koufuye",
+    "is_verified": true
+  },
+  {
+    "canonical_name_en": "Amoxicillin Capsules",
+    "canonical_name_zh": "\u963f\u83ab\u897f\u6797\u80f6\u56ca",
+    "barcode": null,
+    "manufacturer": null,
+    "manufacturer_en": null,
+    "usage": "\u6297\u751f\u7d20\u7c7b\u836f\u7269\uff0c\u5e94\u6309\u533b\u751f\u6216\u836f\u5e08\u6307\u5bfc\u4f7f\u7528\u3002",
+    "usage_en": "Antibiotic medicine. Use only under doctor or pharmacist guidance.",
+    "dosage": "Follow prescription label",
+    "warnings": "\u9752\u9709\u7d20\u8fc7\u654f\u8005\u7981\u7528\u3002\u4e0d\u8981\u81ea\u884c\u6ee5\u7528\u6297\u751f\u7d20\u3002",
+    "warnings_en": "Do not use if allergic to penicillin. Do not misuse antibiotics without professional advice.",
+    "aliases": "\u963f\u83ab\u897f\u6797;\u963f\u83ab\u897f\u6797\u80f6\u56ca;Amoxicillin;Amoxicillin Capsule",
+    "is_verified": true
+  },
+  {
+    "canonical_name_en": "Ibuprofen Tablets",
+    "canonical_name_zh": "\u5e03\u6d1b\u82ac\u7247",
+    "barcode": null,
+    "manufacturer": null,
+    "manufacturer_en": null,
+    "usage": "\u7528\u4e8e\u7f13\u89e3\u53d1\u70ed\u3001\u75bc\u75db\u7b49\u75c7\u72b6\u3002",
+    "usage_en": "Used to relieve fever and pain symptoms.",
+    "dosage": "Follow package label or professional advice",
+    "warnings": "\u80c3\u6e83\u75a1\u3001\u80be\u75c5\u3001\u6297\u51dd\u836f\u4f7f\u7528\u8005\u6216\u5b55\u5987\u5e94\u5148\u54a8\u8be2\u533b\u751f\u6216\u836f\u5e08\u3002",
+    "warnings_en": "People with stomach ulcers, kidney disease, anticoagulant use, or pregnancy should ask a doctor or pharmacist first.",
+    "aliases": "\u5e03\u6d1b\u82ac;\u5e03\u6d1b\u82ac\u7247;Ibuprofen",
+    "is_verified": true
+  },
+  {
+    "canonical_name_en": "Paracetamol Tablets",
+    "canonical_name_zh": "\u5bf9\u4e59\u9170\u6c28\u57fa\u915a\u7247",
+    "barcode": null,
+    "manufacturer": null,
+    "manufacturer_en": null,
+    "usage": "\u7528\u4e8e\u7f13\u89e3\u53d1\u70ed\u548c\u8f7b\u4e2d\u5ea6\u75bc\u75db\u3002",
+    "usage_en": "Used to relieve fever and mild to moderate pain.",
+    "dosage": "Follow package label or professional advice",
+    "warnings": "\u907f\u514d\u4e0e\u5176\u4ed6\u542b\u5bf9\u4e59\u9170\u6c28\u57fa\u915a\u7684\u836f\u7269\u91cd\u590d\u4f7f\u7528\uff0c\u8fc7\u91cf\u53ef\u80fd\u635f\u4f24\u809d\u810f\u3002",
+    "warnings_en": "Avoid duplicate use with other paracetamol/acetaminophen products. Overdose may harm the liver.",
+    "aliases": "\u5bf9\u4e59\u9170\u6c28\u57fa\u915a;\u6251\u70ed\u606f\u75db;Paracetamol;Acetaminophen",
+    "is_verified": true
+  }
+]
