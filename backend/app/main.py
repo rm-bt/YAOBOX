@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import inspect, text
 
-from app.api.routes import auth, history, reminders, scans, users
+from .api.routes import auth, scans, reminders, users, history, assistant
 from app.api.routes.medicines import router as medicines_router
 from app.core.database import Base, engine
 from app.models.medicine import Medicine
@@ -84,6 +84,7 @@ app.include_router(scans.router, prefix="/scans", tags=["Scans"])
 app.include_router(history.router)
 app.include_router(reminders.router)
 app.include_router(medicines_router)
+app.include_router(assistant.router, prefix="/assistant", tags=["Assistant"])
 
 
 @app.get("/")

@@ -14,8 +14,8 @@ export function useTheme() {
 
     function syncTheme() {
       const nextTheme = getStoredTheme();
-      setThemeState(nextTheme);
       applyTheme(nextTheme);
+      setThemeState(nextTheme);
     }
 
     window.addEventListener("storage", syncTheme);

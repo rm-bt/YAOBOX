@@ -1,0 +1,78 @@
+.yaobox-app-shell.theme-dark {
+  background: #020617;
+  color: #f8fafc;
+}
+
+.yaobox-app-shell.theme-dark .app-shell-sidebar {
+  background: #020617;
+  border-color: #1e293b;
+}
+
+.yaobox-app-shell.theme-dark .app-shell-header {
+  background: rgba(2, 6, 23, 0.96);
+  border-color: #1e293b;
+}
+
+.yaobox-app-shell.theme-dark .app-shell-search {
+  background: #0f172a;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+.yaobox-app-shell.theme-dark .app-shell-search input {
+  color: #f8fafc;
+}
+
+.yaobox-app-shell.theme-dark .app-shell-search input::placeholder {
+  color: #64748b;
+}
+
+.yaobox-app-shell.theme-dark .bg-white {
+  background-color: #0f172a !important;
+}
+
+.yaobox-app-shell.theme-dark .bg-slate-50 {
+  background-color: #111827 !important;
+}
+
+.yaobox-app-shell.theme-dark .bg-slate-100 {
+  background-color: #1e293b !important;
+}
+
+.yaobox-app-shell.theme-dark .border-slate-100,
+.yaobox-app-shell.theme-dark .border-slate-200 {
+  border-color: #1e293b !important;
+}
+
+.yaobox-app-shell.theme-dark .text-slate-900 {
+  color: #f8fafc !important;
+}
+
+.yaobox-app-shell.theme-dark .text-slate-800 {
+  color: #e2e8f0 !important;
+}
+
+.yaobox-app-shell.theme-dark .text-slate-700 {
+  color: #cbd5e1 !important;
+}
+
+.yaobox-app-shell.theme-dark .text-slate-600 {
+  color: #94a3b8 !important;
+}
+
+.yaobox-app-shell.theme-dark .text-slate-500 {
+  color: #64748b !important;
+}
+
+.yaobox-app-shell.theme-dark input,
+.yaobox-app-shell.theme-dark textarea,
+.yaobox-app-shell.theme-dark select {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+.yaobox-app-shell.theme-dark input::placeholder,
+.yaobox-app-shell.theme-dark textarea::placeholder {
+  color: #64748b !important;
+}

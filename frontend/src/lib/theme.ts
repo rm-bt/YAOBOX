@@ -7,9 +7,9 @@ export function getStoredTheme(): ThemeMode {
     return "light";
   }
 
-  const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-
-  return stored === "dark" ? "dark" : "light";
+  return window.localStorage.getItem(THEME_STORAGE_KEY) === "dark"
+    ? "dark"
+    : "light";
 }
 
 export function applyTheme(theme: ThemeMode) {
@@ -17,8 +17,14 @@ export function applyTheme(theme: ThemeMode) {
     return;
   }
 
-  document.documentElement.dataset.theme = theme;
-  document.documentElement.classList.toggle("dark", theme === "dark");
+  document.body.classList.remove("yaobox-theme-light", "yaobox-theme-dark");
+  document.body.classList.add(
+    theme === "dark" ? "yaobox-theme-dark" : "yaobox-theme-light"
+  );
+
+  document.documentElement.classList.remove("dark", "light");
+  document.documentElement.removeAttribute("data-theme");
+  document.documentElement.style.colorScheme = theme;
 }
 
 export function setStoredTheme(theme: ThemeMode) {

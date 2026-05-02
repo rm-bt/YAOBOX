@@ -12,6 +12,7 @@ import {
   History,
   LayoutDashboard,
   LogOut,
+  MessageCircle,
   Pill,
   Plus,
   ScanLine,
@@ -19,7 +20,6 @@ import {
   Settings,
   UserRound,
 } from "lucide-react";
-
 import { useAuthStore } from "../../features/auth/store/auth.store";
 import { useAvatar } from "../../hooks/useAvatar";
 import { useTheme } from "../../hooks/useTheme";
@@ -27,10 +27,12 @@ import { useTheme } from "../../hooks/useTheme";
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/scan", label: "Scan", icon: ScanLine },
+  { to: "/assistant", label: "Assistant", icon: MessageCircle },
   { to: "/history", label: "History", icon: History },
   { to: "/reminders", label: "Reminders", icon: Clock3 },
   { to: "/settings", label: "Settings", icon: Settings },
   { to: "/profile", label: "Profile", icon: UserRound },
+  
 ];
 
 function navClass(isActive: boolean) {

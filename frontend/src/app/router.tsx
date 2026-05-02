@@ -18,6 +18,7 @@ import ProfilePage from "../features/profile/pages/ProfilePage";
 import RemindersPage from "../features/reminders/pages/RemindersPage";
 import CreateReminderPage from "../features/reminders/pages/CreateReminderPage";
 import SettingsPage from "../features/settings/pages/SettingsPage";
+import AssistantPage from "../features/assistant/pages/AssistantPage";
 export function AppRouter() {
   return (
     <Routes>
@@ -43,6 +44,7 @@ export function AppRouter() {
           <Route path="/reminders/create" element={<CreateReminderPage />} />
 
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/assistant" element={<AssistantPage />} />
         </Route>
       </Route>
 
