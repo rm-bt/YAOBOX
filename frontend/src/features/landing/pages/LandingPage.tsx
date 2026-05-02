@@ -16,6 +16,7 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { ThemeToggle } from "../../../components/ThemeToggle";
 
 const Logo = ({
   className = "h-10",
@@ -55,12 +56,15 @@ const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
 
   const navItems = ["Features", "How it Works", "Pricing", "Support"];
+  
 
   return (
+    
     <nav className="fixed top-0 z-50 w-full border-b border-brand-primary/5 bg-brand-surface/80 backdrop-blur-md">
       <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6">
         <Link to="/">
           <Logo className="h-10 origin-left scale-75 transform md:scale-90" />
+          
         </Link>
 
         <div className="hidden items-center gap-8 md:flex">
@@ -74,10 +78,13 @@ const Navbar = () => {
             </a>
           ))}
 
+          
+<ThemeToggle compact />
           <Link
             to="/register"
             className="pill-button bg-brand-secondary text-white shadow-md hover:bg-brand-secondary/90"
           >
+             
             Get Started
           </Link>
         </div>

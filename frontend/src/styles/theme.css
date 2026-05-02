@@ -1,0 +1,258 @@
+body.yaobox-theme-light {
+  background: #f8faf6;
+  color: #191c1a;
+}
+
+body.yaobox-theme-dark {
+  background: #020617;
+  color: #f8fafc;
+}
+
+body.yaobox-theme-dark,
+body.yaobox-theme-dark #root {
+  background: #020617 !important;
+  color: #f8fafc !important;
+}
+
+/* Page backgrounds */
+body.yaobox-theme-dark .bg-brand-surface,
+body.yaobox-theme-dark .bg-surface-bright,
+body.yaobox-theme-dark .bg-\[\#f8faf6\],
+body.yaobox-theme-dark .bg-\[\#f6f8f4\],
+body.yaobox-theme-dark .bg-\[\#F6F8F4\] {
+  background-color: #020617 !important;
+}
+
+body.yaobox-theme-dark .bg-surface-container-lowest,
+body.yaobox-theme-dark .bg-surface-container-low,
+body.yaobox-theme-dark .bg-surface-container,
+body.yaobox-theme-dark .bg-surface-container-high,
+body.yaobox-theme-dark .bg-white,
+body.yaobox-theme-dark .bg-white\/40,
+body.yaobox-theme-dark .bg-white\/60,
+body.yaobox-theme-dark .bg-white\/70,
+body.yaobox-theme-dark .bg-white\/80,
+body.yaobox-theme-dark .bg-stone-50,
+body.yaobox-theme-dark .bg-slate-50 {
+  background-color: #0f172a !important;
+}
+
+body.yaobox-theme-dark .bg-stone-100,
+body.yaobox-theme-dark .bg-slate-100 {
+  background-color: #1e293b !important;
+}
+
+/* Borders */
+body.yaobox-theme-dark .border-brand-primary\/5,
+body.yaobox-theme-dark .border-yaobox-primary-container\/10,
+body.yaobox-theme-dark .border-yaobox-primary-container\/20,
+body.yaobox-theme-dark .border-outline-variant,
+body.yaobox-theme-dark .border-outline-variant\/20,
+body.yaobox-theme-dark .border-outline-variant\/30,
+body.yaobox-theme-dark .border-outline-variant\/40,
+body.yaobox-theme-dark .border-stone-100,
+body.yaobox-theme-dark .border-stone-100\/50,
+body.yaobox-theme-dark .border-stone-200,
+body.yaobox-theme-dark .border-slate-100,
+body.yaobox-theme-dark .border-slate-200,
+body.yaobox-theme-dark .border-\[\#e7ebdf\],
+body.yaobox-theme-dark .border-\[\#d9e1ee\],
+body.yaobox-theme-dark .border-\[\#e4e7de\] {
+  border-color: #334155 !important;
+}
+
+/* Real dark text colors */
+body.yaobox-theme-dark .text-on-surface,
+body.yaobox-theme-dark .text-brand-ink,
+body.yaobox-theme-dark .text-black,
+body.yaobox-theme-dark .text-stone-950,
+body.yaobox-theme-dark .text-stone-900,
+body.yaobox-theme-dark .text-slate-950,
+body.yaobox-theme-dark .text-slate-900,
+body.yaobox-theme-dark .text-\[\#191C1A\],
+body.yaobox-theme-dark .text-\[\#191c1a\],
+body.yaobox-theme-dark .text-\[\#1a1c19\],
+body.yaobox-theme-dark .text-\[\#0f1c3f\],
+body.yaobox-theme-dark .text-\[\#13224a\],
+body.yaobox-theme-dark .text-\[\#1b2437\],
+body.yaobox-theme-dark .text-\[\#33415c\] {
+  color: #f8fafc !important;
+}
+
+body.yaobox-theme-dark .text-on-surface-variant,
+body.yaobox-theme-dark .text-brand-muted,
+body.yaobox-theme-dark .text-outline,
+body.yaobox-theme-dark .text-stone-800,
+body.yaobox-theme-dark .text-stone-700,
+body.yaobox-theme-dark .text-stone-600,
+body.yaobox-theme-dark .text-stone-500,
+body.yaobox-theme-dark .text-slate-800,
+body.yaobox-theme-dark .text-slate-700,
+body.yaobox-theme-dark .text-slate-600,
+body.yaobox-theme-dark .text-slate-500,
+body.yaobox-theme-dark .text-\[\#454840\],
+body.yaobox-theme-dark .text-\[\#454d3d\],
+body.yaobox-theme-dark .text-\[\#46536a\],
+body.yaobox-theme-dark .text-\[\#66728a\],
+body.yaobox-theme-dark .text-\[\#70809b\],
+body.yaobox-theme-dark .text-\[\#7a879d\] {
+  color: #cbd5e1 !important;
+}
+
+/* Brand colors in dark mode */
+body.yaobox-theme-dark .text-brand-primary,
+body.yaobox-theme-dark .text-yaobox-primary {
+  color: #d9e9c6 !important;
+}
+
+body.yaobox-theme-dark .text-brand-secondary,
+body.yaobox-theme-dark .text-yaobox-secondary {
+  color: #d8d0ca !important;
+}
+
+body.yaobox-theme-dark .text-yaobox-tertiary {
+  color: #fca5a5 !important;
+}
+
+body.yaobox-theme-dark .text-yaobox-on-primary-container,
+body.yaobox-theme-dark .text-\[\#2d3a22\],
+body.yaobox-theme-dark .text-\[\#425235\],
+body.yaobox-theme-dark .text-\[\#4b5a3e\],
+body.yaobox-theme-dark .text-\[\#5b694e\] {
+  color: #2d3a22 !important;
+}
+
+/* Headers and top bars */
+body.yaobox-theme-dark header,
+body.yaobox-theme-dark nav,
+body.yaobox-theme-dark .app-shell-header,
+body.yaobox-theme-dark .app-shell-sidebar {
+  background-color: #020617 !important;
+  border-color: #1e293b !important;
+}
+
+body.yaobox-theme-dark .app-shell-search {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+  color: #cbd5e1 !important;
+}
+
+body.yaobox-theme-dark .app-shell-search input {
+  background: transparent !important;
+}
+
+/* Inputs */
+body.yaobox-theme-dark input,
+body.yaobox-theme-dark textarea,
+body.yaobox-theme-dark select {
+  background-color: #111827 !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+body.yaobox-theme-dark input::placeholder,
+body.yaobox-theme-dark textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Buttons */
+body.yaobox-theme-dark .bg-brand-primary,
+body.yaobox-theme-dark .bg-yaobox-primary {
+  background-color: #556347 !important;
+  color: #ffffff !important;
+}
+
+body.yaobox-theme-dark .bg-brand-secondary,
+body.yaobox-theme-dark .bg-yaobox-secondary,
+body.yaobox-theme-dark .bg-\[\#635d5a\],
+body.yaobox-theme-dark .bg-\[\#6b625d\] {
+  background-color: #635d5a !important;
+  color: #ffffff !important;
+}
+
+body.yaobox-theme-dark .bg-brand-light,
+body.yaobox-theme-dark .bg-brand-light\/30,
+body.yaobox-theme-dark .bg-brand-light\/40,
+body.yaobox-theme-dark .bg-brand-light\/50,
+body.yaobox-theme-dark .bg-brand-primary-container,
+body.yaobox-theme-dark .bg-brand-primary-container\/30,
+body.yaobox-theme-dark .bg-brand-primary-container\/40,
+body.yaobox-theme-dark .bg-yaobox-primary-container,
+body.yaobox-theme-dark .bg-yaobox-primary-container\/30,
+body.yaobox-theme-dark .bg-yaobox-primary-container\/40,
+body.yaobox-theme-dark .bg-\[\#d9e9c6\],
+body.yaobox-theme-dark .bg-\[\#e1ecd6\] {
+  background-color: #d9e9c6 !important;
+  color: #2d3a22 !important;
+}
+
+/* Login/register glass/card cleanup */
+body.yaobox-theme-dark .glass-card {
+  background: rgba(15, 23, 42, 0.85) !important;
+  border-color: rgba(148, 163, 184, 0.25) !important;
+}
+
+body.yaobox-theme-dark .shadow-ambient {
+  box-shadow: 0 24px 80px -32px rgba(0, 0, 0, 0.75) !important;
+}
+
+/* Scan page: no more stupid white protected upload card */
+body.yaobox-theme-dark [style*="data:image/svg+xml"] {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+}
+
+body.yaobox-theme-dark [style*="data:image/svg+xml"] h3,
+body.yaobox-theme-dark [style*="data:image/svg+xml"] p {
+  color: #f8fafc !important;
+}
+
+body.yaobox-theme-dark [style*="data:image/svg+xml"] .bg-yaobox-primary-container {
+  background-color: #d9e9c6 !important;
+  color: #2d3a22 !important;
+}
+
+/* Result and info cards */
+body.yaobox-theme-dark details,
+body.yaobox-theme-dark .rounded-\[24px\],
+body.yaobox-theme-dark .rounded-\[2rem\],
+body.yaobox-theme-dark .rounded-\[3rem\] {
+  border-color: #334155;
+}
+
+/* Error/success cards keep meaning */
+body.yaobox-theme-dark .bg-red-50 {
+  background-color: rgba(127, 29, 29, 0.35) !important;
+}
+
+body.yaobox-theme-dark .text-red-700 {
+  color: #fca5a5 !important;
+}
+
+body.yaobox-theme-dark .border-red-100 {
+  border-color: rgba(248, 113, 113, 0.3) !important;
+}
+
+body.yaobox-theme-dark .bg-emerald-50 {
+  background-color: rgba(6, 78, 59, 0.35) !important;
+}
+
+body.yaobox-theme-dark .text-emerald-700 {
+  color: #6ee7b7 !important;
+}
+
+body.yaobox-theme-dark .border-emerald-100 {
+  border-color: rgba(52, 211, 153, 0.3) !important;
+}
+
+body.yaobox-theme-dark .bg-amber-50 {
+  background-color: rgba(120, 53, 15, 0.35) !important;
+}
+
+body.yaobox-theme-dark .text-amber-800 {
+  color: #fcd34d !important;
+}
+
+body.yaobox-theme-dark .border-amber-100 {
+  border-color: rgba(251, 191, 36, 0.3) !important;
+}

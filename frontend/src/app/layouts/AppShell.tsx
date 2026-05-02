@@ -1,5 +1,11 @@
 import { useEffect } from "react";
-import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import {
+  Link,
+  NavLink,
+  Outlet,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import {
   Bell,
   Clock3,
@@ -7,14 +13,16 @@ import {
   LayoutDashboard,
   LogOut,
   Pill,
+  Plus,
   ScanLine,
   Search,
   Settings,
   UserRound,
-  Plus,
 } from "lucide-react";
+
 import { useAuthStore } from "../../features/auth/store/auth.store";
 import { useAvatar } from "../../hooks/useAvatar";
+import { useTheme } from "../../hooks/useTheme";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -29,7 +37,7 @@ function navClass(isActive: boolean) {
   return [
     "flex items-center gap-4 rounded-full px-5 py-4 text-[15px] font-semibold transition-all",
     isActive
-      ? "bg-[#d9e9c6] text-[#2d3a22]"
+      ? "bg-[#d9e9c6] text-[#2d3a22] shadow-sm"
       : "text-[#46536a] hover:bg-[#eef3e4] hover:text-[#1b2437]",
   ].join(" ");
 }
@@ -39,6 +47,7 @@ export function AppShell() {
   const location = useLocation();
   const clearSession = useAuthStore((state) => state.clearSession);
   const { avatar } = useAvatar();
+  const { theme } = useTheme();
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
@@ -50,9 +59,14 @@ export function AppShell() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f6f8f4] text-[#0f1c3f] dark:bg-slate-950 dark:text-slate-100">
+    <div
+      className={[
+        "yaobox-app-shell min-h-screen text-[#0f1c3f]",
+        theme === "dark" ? "bg-[#020617]" : "bg-[#f6f8f4]",
+      ].join(" ")}
+    >
       <div className="flex min-h-screen">
-        <aside className="hidden lg:flex w-[304px] shrink-0 flex-col border-r border-[#e7ebdf] bg-white/40 px-5 py-6 dark:border-slate-800 dark:bg-slate-950">
+        <aside className="app-shell-sidebar hidden lg:flex w-[304px] shrink-0 flex-col border-r border-[#e7ebdf] bg-white/40 px-5 py-6">
           <Link to="/dashboard" className="flex items-center gap-4 px-4 py-4">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#d9e9c6] text-[#4b5a3e]">
               <Pill className="h-7 w-7 -rotate-45" strokeWidth={2.4} />
@@ -62,7 +76,9 @@ export function AppShell() {
               <div className="text-[21px] font-bold tracking-tight text-[#13224a]">
                 Yaobox
               </div>
-              <div className="text-[14px] text-[#66728a]">Clinical Wellness</div>
+              <div className="text-[14px] text-[#66728a]">
+                Clinical Wellness
+              </div>
             </div>
           </Link>
 
@@ -104,9 +120,9 @@ export function AppShell() {
         </aside>
 
         <div className="min-w-0 flex-1">
-          <header className="sticky top-0 z-30 border-b border-[#e7ebdf] bg-[#f6f8f4]/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
+          <header className="app-shell-header sticky top-0 z-30 border-b border-[#e7ebdf] bg-[#f6f8f4]/95 backdrop-blur">
             <div className="flex items-center gap-4 px-5 py-5 lg:px-8">
-              <div className="hidden md:flex h-14 w-full max-w-[440px] items-center gap-3 rounded-full border border-[#d9e1ee] bg-white px-5 text-[#7a879d] shadow-sm">
+              <div className="app-shell-search hidden md:flex h-14 w-full max-w-[440px] items-center gap-3 rounded-full border border-[#d9e1ee] bg-white px-5 text-[#7a879d] shadow-sm">
                 <Search className="h-5 w-5" strokeWidth={2.2} />
                 <input
                   type="text"
@@ -119,27 +135,26 @@ export function AppShell() {
                 <button
                   type="button"
                   className="flex h-11 w-11 items-center justify-center rounded-full text-[#70809b] transition-all hover:bg-white hover:text-[#13224a]"
+                  title="Notifications"
                 >
                   <Bell className="h-6 w-6" strokeWidth={2.1} />
                 </button>
 
                 <Link
-                   to="/settings"
-                   className="flex h-11 w-11 items-center justify-center rounded-full text-[#70809b] transition-all hover:bg-white hover:text-[#13224a] dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
-                   title="Settings"
-                > 
-                    <Settings className="h-6 w-6" strokeWidth={2.1} />
+                  to="/settings"
+                  className="flex h-11 w-11 items-center justify-center rounded-full text-[#70809b] transition-all hover:bg-white hover:text-[#13224a]"
+                  title="Settings"
+                >
+                  <Settings className="h-6 w-6" strokeWidth={2.1} />
                 </Link>
-                
 
                 <Link
-                
-                   to="/profile"
-                    className={`flex h-14 w-14 items-center justify-center rounded-full border-2 border-white ${avatar.bgClass} text-[#425235] shadow-sm text-2xl`}
-                    title={`Avatar: ${avatar.label}`}
+                  to="/profile"
+                  className={`flex h-14 w-14 items-center justify-center rounded-full border-2 border-white ${avatar.bgClass} text-[#425235] shadow-sm text-2xl`}
+                  title={`Avatar: ${avatar.label}`}
                 >
-                   <span aria-hidden="true">{avatar.emoji}</span>
-                   <span className="sr-only">Open profile</span>
+                  <span aria-hidden="true">{avatar.emoji}</span>
+                  <span className="sr-only">Open profile</span>
                 </Link>
               </div>
             </div>
