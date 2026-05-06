@@ -1,34 +1,26 @@
-import os
 from pathlib import Path
-
-from dotenv import dotenv_values
+import os
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
+# Absolute path to backend/.env
+ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-BACKEND_ENV_PATH = PROJECT_ROOT / "backend" / ".env"
+print("Looking for .env at:", ENV_PATH)
 
-env_values = dotenv_values(BACKEND_ENV_PATH)
+# Force load
+load_dotenv(dotenv_path=ENV_PATH, override=True)
 
-# Prefer backend/.env for this thesis project so stale PowerShell env vars do not hijack the DB URL.
-DATABASE_URL = (
-    env_values.get("DATABASE_URL")
-    or os.getenv("DATABASE_URL")
-    or "postgresql://postgres:postgres@127.0.0.1:5432/yaobox_db"
-).strip()
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+print("DATABASE_URL USED:", DATABASE_URL)
 
 if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL is missing. Add it to backend/.env.")
-
-connect_args = {}
-
-if DATABASE_URL.startswith("sqlite"):
-    connect_args = {"check_same_thread": False}
+    raise RuntimeError("DATABASE_URL is missing. .env not loaded.")
 
 engine = create_engine(
     DATABASE_URL,
-    connect_args=connect_args,
     pool_pre_ping=True,
 )
 
