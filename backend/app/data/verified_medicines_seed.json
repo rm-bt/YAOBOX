@@ -44,7 +44,7 @@
   {
     "canonical_name_en": "Paracetamol Tablets",
     "canonical_name_zh": "\u5bf9\u4e59\u9170\u6c28\u57fa\u915a\u7247",
-    "barcode": null,
+    "barcode": 123456789123456789,
     "manufacturer": null,
     "manufacturer_en": null,
     "usage": "\u7528\u4e8e\u7f13\u89e3\u53d1\u70ed\u548c\u8f7b\u4e2d\u5ea6\u75bc\u75db\u3002",

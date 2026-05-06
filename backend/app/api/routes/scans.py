@@ -25,6 +25,7 @@ from app.services.upload_validation import (
     validate_image_upload_metadata,
     validate_upload_bytes,
 )
+from app.services.medicine_catalog_service import match_catalog_medicine
 
 router = APIRouter()
 
@@ -176,58 +177,19 @@ def find_catalog_match(
     barcode: str | None,
     extracted_name: str | None,
     raw_text: str | None,
+    extracted_dosage: str | None = None,
+    extracted_manufacturer: str | None = None,
 ) -> Medicine | None:
-    clean_barcode = normalize_text(barcode)
-    clean_name = normalize_text(extracted_name)
-    normalized_name = normalize_lookup_key(clean_name)
-
-    if clean_barcode:
-        medicine = db.query(Medicine).filter(Medicine.barcode == clean_barcode).first()
-        if medicine:
-            return medicine
-
-    medicines = (
-        db.query(Medicine)
-        .order_by(Medicine.is_verified.desc(), Medicine.id.desc())
-        .all()
+    result = match_catalog_medicine(
+        db=db,
+        barcode=barcode,
+        extracted_name=extracted_name,
+        extracted_dosage=extracted_dosage,
+        extracted_manufacturer=extracted_manufacturer,
+        raw_text=raw_text,
     )
 
-    candidates: list[str] = []
-
-    if clean_name:
-        candidates.append(clean_name)
-
-    if normalized_name and normalized_name != clean_name:
-        candidates.append(normalized_name)
-
-    if raw_text:
-        lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
-        candidates.extend(lines[:8])
-
-    normalized_candidates = []
-    for value in candidates:
-        normalized = normalize_lookup_key(value)
-        if normalized:
-            normalized_candidates.append(normalized)
-
-    for medicine in medicines:
-        keys = [
-            medicine.canonical_name_zh or "",
-            medicine.canonical_name_en or "",
-            medicine.aliases or "",
-            medicine.barcode or "",
-        ]
-
-        normalized_keys = [normalize_lookup_key(key) for key in keys if key]
-
-        for candidate in normalized_candidates:
-            for key in normalized_keys:
-                if not key:
-                    continue
-                if candidate == key or candidate in key or key in candidate:
-                    return medicine
-
-    return None
+    return result.medicine
 
 
 def save_upload_file(file: UploadFile) -> str:
@@ -337,18 +299,27 @@ def upload_scan_image(
             barcode=barcode,
             extracted_name=extracted_name,
             raw_text=cleaned_text,
+            extracted_dosage=extracted_dosage,
+            extracted_manufacturer=extracted_manufacturer,
         )
 
         if catalog_match:
             medicine_name = (
-                catalog_match.canonical_name_zh
-                or catalog_match.canonical_name_en
+                catalog_match.canonical_name_en
+                or catalog_match.canonical_name_zh
                 or extracted_name
             )
-            manufacturer = catalog_match.manufacturer or extracted_manufacturer
-            usage = catalog_match.usage or extracted_usage
+            manufacturer = (
+                catalog_match.manufacturer_en
+                or catalog_match.manufacturer
+                or extracted_manufacturer
+            )
+            usage = catalog_match.usage_en or catalog_match.usage or extracted_usage
             dosage = catalog_match.dosage or extracted_dosage
-            warnings = extract_warning_text(cleaned_text, catalog_match.warnings)
+            warnings = extract_warning_text(
+                cleaned_text,
+                catalog_match.warnings_en or catalog_match.warnings,
+            )
             translated_result = build_catalog_explanation(
                 catalog_match,
                 raw_text=cleaned_text,
@@ -374,7 +345,9 @@ def upload_scan_image(
             catalog_match,
             fallback="ocr_extracted" if cleaned_text else "unknown",
         )
-        ai_status = get_ai_status(translated_result)
+        ai_status = (
+            "not_used_catalog_match" if catalog_match else get_ai_status(translated_result)
+        )
         trust_notes = build_trust_notes(
             source_type=source_type,
             match_status=match_status,
@@ -451,14 +424,18 @@ def scan_by_barcode(
 
         if catalog_match:
             medicine_name = (
-                catalog_match.canonical_name_zh
-                or catalog_match.canonical_name_en
+                catalog_match.canonical_name_en
+                or catalog_match.canonical_name_zh
                 or f"Barcode {clean_barcode}"
             )
-            manufacturer = catalog_match.manufacturer
-            usage = catalog_match.usage or "Catalog match found for barcode input."
+            manufacturer = catalog_match.manufacturer_en or catalog_match.manufacturer
+            usage = (
+                catalog_match.usage_en
+                or catalog_match.usage
+                or "Catalog match found for barcode input."
+            )
             dosage = catalog_match.dosage
-            warnings = catalog_match.warnings
+            warnings = catalog_match.warnings_en or catalog_match.warnings
             translated_result = build_catalog_explanation(catalog_match)
             medicine_id = catalog_match.id
         else:
@@ -478,7 +455,9 @@ def scan_by_barcode(
 
         source_type = "barcode"
         match_status = get_match_status(catalog_match, fallback="barcode_unknown")
-        ai_status = get_ai_status(translated_result)
+        ai_status = (
+            "not_used_catalog_match" if catalog_match else get_ai_status(translated_result)
+        )
         trust_notes = build_trust_notes(
             source_type=source_type,
             match_status=match_status,
