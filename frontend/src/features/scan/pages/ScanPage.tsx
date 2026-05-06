@@ -23,11 +23,12 @@ import {
   Smartphone,
   Upload,
 } from "lucide-react";
-
-const API_BASE_URL =
-  (import.meta as ImportMeta & {
-    env?: { VITE_API_BASE_URL?: string };
-  }).env?.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
+import { useUploadMedicineScan } from "../hooks/useUploadMedicineScan";
+import { useScanBarcode } from "../hooks/useCreateManualScan";
+import {
+  mapScanResponse,
+  type NormalizedScanResult,
+} from "../utils/mapScanResponse";
 
 const dottedBorderStyle: CSSProperties = {
   backgroundImage:
@@ -40,246 +41,6 @@ const PROCESS_STEPS = [
   "Running OCR extraction",
   "Generating explanation and structured output",
 ] as const;
-
-type RawRecord = Record<string, unknown>;
-
-type NormalizedScanResult = {
-  scanId: string;
-  sourceType: string;
-  sourceLabel: string;
-  confidence: number | null;
-  confidenceLabel: string | null;
-  medicineName: string;
-  medicineNameZh: string;
-  matchStatus: string;
-  barcode: string;
-  dosage: string;
-  usage: string;
-  manufacturer: string;
-  translatedSummary: string;
-  extractedText: string;
-  warnings: string[];
-  imagePreview: string | null;
-};
-
-function firstNonEmptyString(...values: unknown[]): string {
-  for (const value of values) {
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-  return "";
-}
-
-function getStoredToken(): string | null {
-  const token = window.localStorage.getItem("yaobox_access_token");
-  if (!token) return null;
-
-  const cleaned = token.trim();
-  if (!cleaned || cleaned === "undefined" || cleaned === "null") {
-    return null;
-  }
-
-  return cleaned;
-}
-
-async function postWithFallback(
-  paths: string[],
-  init: RequestInit
-): Promise<unknown> {
-  const token = getStoredToken();
-  let lastError: Error | null = null;
-
-  for (const path of paths) {
-    try {
-      const response = await fetch(`${API_BASE_URL}${path}`, {
-        ...init,
-        headers: {
-          Accept: "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          ...(init.headers ?? {}),
-        },
-      });
-
-      if (!response.ok) {
-        if (response.status === 404) continue;
-
-        const text = await response.text();
-        throw new Error(
-          text || `Request failed for ${path} with status ${response.status}`
-        );
-      }
-
-      return await response.json();
-    } catch (error) {
-      lastError =
-        error instanceof Error ? error : new Error("Unknown scan request failure");
-    }
-  }
-
-  throw lastError ?? new Error("No scan endpoint responded successfully.");
-}
-
-function humanizeSourceType(value: string): string {
-  const normalized = value.trim().toLowerCase();
-
-  if (normalized === "barcode") return "Barcode";
-  if (normalized === "image_upload") return "Image Upload";
-  if (normalized === "manual_entry") return "Manual Entry";
-  if (normalized === "prescription") return "Prescription";
-  if (normalized === "report") return "Report";
-
-  return value.replace(/_/g, " ") || "Scan";
-}
-
-function humanizeMatchStatus(value: string): string {
-  const normalized = value.trim().toLowerCase();
-
-  if (!normalized || normalized === "unknown") return "Detected";
-  if (normalized === "identified") return "Identified";
-  if (normalized === "verified") return "Verified";
-  if (normalized === "probable") return "Probable";
-  if (normalized === "saved") return "Saved";
-
-  return value.replace(/_/g, " ");
-}
-
-function extractChinesePreview(rawText: string): string {
-  if (!rawText) return "";
-  const lines = rawText
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  return lines.find((line) => /[\u3400-\u9fff]/.test(line)) ?? "";
-}
-
-function normalizeScanResult(
-  rawInput: unknown,
-  imagePreview: string | null,
-  fallbackSourceType: "image_upload" | "barcode"
-): NormalizedScanResult {
-  const raw = (rawInput ?? {}) as RawRecord;
-  const medicine = ((raw.medicine as RawRecord | undefined) ?? {}) as RawRecord;
-
-  const warningsValue =
-    raw.warnings ??
-    raw.warning ??
-    medicine.warnings ??
-    medicine.warning ??
-    raw.precautions;
-
-  const warnings = Array.isArray(warningsValue)
-    ? warningsValue
-        .map((item) => (typeof item === "string" ? item.trim() : ""))
-        .filter(Boolean)
-    : firstNonEmptyString(warningsValue)
-      ? [firstNonEmptyString(warningsValue)]
-      : [];
-
-  let confidence: number | null = null;
-  let confidenceLabel: string | null = null;
-  const rawConfidence = raw.confidence;
-
-  if (typeof rawConfidence === "number") {
-    confidence = rawConfidence;
-    confidenceLabel = `${Math.round(rawConfidence * 100)}% confidence`;
-  } else if (rawConfidence && typeof rawConfidence === "object") {
-    const confidenceObj = rawConfidence as RawRecord;
-    if (typeof confidenceObj.ocr === "number") {
-      confidence = confidenceObj.ocr;
-      confidenceLabel = `${Math.round(confidenceObj.ocr * 100)}% OCR`;
-    }
-  } else if (typeof raw.ocr_confidence === "number") {
-    confidence = raw.ocr_confidence;
-    confidenceLabel = `${Math.round(raw.ocr_confidence * 100)}% OCR`;
-  }
-
-  const sourceType =
-    firstNonEmptyString(raw.sourceType, raw.source_type) || fallbackSourceType;
-
-  if (!confidenceLabel && sourceType === "barcode") {
-    confidenceLabel = "Barcode lookup";
-  }
-
-  const extractedText =
-    firstNonEmptyString(
-      raw.extractedTextZh,
-      raw.extracted_text_zh,
-      raw.raw_text,
-      raw.raw_ocr_text,
-      raw.ocr_text,
-      raw.original_text
-    ) || "Original extracted text was not returned.";
-
-  const chinesePreview = extractChinesePreview(extractedText);
-
-  return {
-    scanId: String(raw.scanId ?? raw.scan_id ?? raw.id ?? crypto.randomUUID()),
-    sourceType,
-    sourceLabel: humanizeSourceType(sourceType),
-    confidence,
-    confidenceLabel,
-    medicineName:
-      firstNonEmptyString(
-        medicine.nameEn,
-        medicine.name_en,
-        raw.medicine_name,
-        raw.name,
-        raw.title,
-        barcodeFallback(raw),
-        chinesePreview
-      ) || "Medicine result",
-    medicineNameZh:
-      firstNonEmptyString(
-        medicine.canonicalNameZh,
-        medicine.canonical_name_zh,
-        medicine.nameZh,
-        medicine.name_zh,
-        raw.name_zh,
-        chinesePreview
-      ) ||
-      (sourceType === "barcode"
-        ? "Barcode-based lookup result"
-        : "Chinese text available below"),
-    matchStatus: humanizeMatchStatus(
-      firstNonEmptyString(medicine.matchStatus, raw.match_status, raw.status) ||
-        "detected"
-    ),
-    barcode:
-      firstNonEmptyString(medicine.barcode, raw.barcode, raw.bar_code) ||
-      "Not available",
-    dosage:
-      firstNonEmptyString(
-        raw.dosage,
-        medicine.dosage_text,
-        medicine.dosageText
-      ) || "Dosage not extracted clearly",
-    usage:
-      firstNonEmptyString(raw.usage, raw.instructions, medicine.usage) ||
-      "Usage details were not returned by the backend.",
-    manufacturer:
-      firstNonEmptyString(raw.manufacturer, medicine.manufacturer) ||
-      "Manufacturer not available",
-    translatedSummary:
-      firstNonEmptyString(
-        raw.translatedSummaryEn,
-        raw.translated_summary_en,
-        raw.translated_text,
-        raw.explanation,
-        raw.summary
-      ) || "English explanation was not returned by the backend.",
-    extractedText,
-    warnings:
-      warnings.length > 0
-        ? warnings
-        : ["No warning text was returned by the backend."],
-    imagePreview,
-  };
-}
-
-function barcodeFallback(raw: RawRecord): string {
-  const barcode = firstNonEmptyString(raw.barcode, raw.bar_code);
-  return barcode ? `Barcode ${barcode}` : "";
-}
 
 const TipCard = ({
   icon,
@@ -305,10 +66,15 @@ export default function ScanPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
+  const uploadMedicineScanMutation = useUploadMedicineScan();
+  const scanBarcodeMutation = useScanBarcode();
+
   const [mode, setMode] = useState<"image" | "barcode">("image");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [barcode, setBarcode] = useState("");
-  const [scanResult, setScanResult] = useState<NormalizedScanResult | null>(null);
+  const [scanResult, setScanResult] = useState<NormalizedScanResult | null>(
+    null
+  );
   const [errorMessage, setErrorMessage] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
@@ -369,37 +135,24 @@ export default function ScanPage() {
           throw new Error("Choose an image before starting analysis.");
         }
 
-        const formData = new FormData();
-        formData.append("file", selectedFile);
+        const response =
+          await uploadMedicineScanMutation.mutateAsync(selectedFile);
 
-        const response = await postWithFallback(
-          ["/scans/upload", "/scan/upload"],
-          {
-            method: "POST",
-            body: formData,
-          }
-        );
-
-        setScanResult(normalizeScanResult(response, previewUrl, "image_upload"));
-      } else {
-        const cleanBarcode = barcode.trim();
-        if (!cleanBarcode) {
-          throw new Error("Enter a barcode before starting analysis.");
-        }
-
-        const response = await postWithFallback(
-          ["/scans/barcode", "/scan/barcode"],
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ barcode: cleanBarcode }),
-          }
-        );
-
-        setScanResult(normalizeScanResult(response, null, "barcode"));
+        setScanResult(mapScanResponse(response, previewUrl, "image_upload"));
+        return;
       }
+
+      const cleanBarcode = barcode.trim();
+
+      if (!cleanBarcode) {
+        throw new Error("Enter a barcode before starting analysis.");
+      }
+
+      const response = await scanBarcodeMutation.mutateAsync({
+        barcode: cleanBarcode,
+      });
+
+      setScanResult(mapScanResponse(response, null, "barcode"));
     } catch (error) {
       const message =
         error instanceof Error
@@ -435,9 +188,9 @@ export default function ScanPage() {
           transition={{ delay: 0.08 }}
           className="text-on-surface-variant text-lg mt-3 max-w-3xl"
         >
-         Upload a medicine package or enter a barcode. The system extracts the
-medicine name and dosage, checks the verified medicine dataset first,
-then uses AI only when verified data is not enough.
+          Upload a medicine package or enter a barcode. The system extracts the
+          medicine name and dosage, checks the verified medicine dataset first,
+          then uses AI only when verified data is not enough.
         </motion.p>
       </header>
 
@@ -454,7 +207,8 @@ then uses AI only when verified data is not enough.
               <button
                 type="button"
                 onClick={() => setMode("image")}
-                className={`px-5 py-3 rounded-full text-sm font-semibold transition-all ${
+                disabled={isAnalyzing}
+                className={`px-5 py-3 rounded-full text-sm font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
                   mode === "image"
                     ? "bg-yaobox-primary-container text-yaobox-on-primary-container"
                     : "bg-white border border-outline-variant text-on-surface-variant"
@@ -466,7 +220,8 @@ then uses AI only when verified data is not enough.
               <button
                 type="button"
                 onClick={() => setMode("barcode")}
-                className={`px-5 py-3 rounded-full text-sm font-semibold transition-all ${
+                disabled={isAnalyzing}
+                className={`px-5 py-3 rounded-full text-sm font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
                   mode === "barcode"
                     ? "bg-yaobox-primary-container text-yaobox-on-primary-container"
                     : "bg-white border border-outline-variant text-on-surface-variant"
@@ -582,7 +337,10 @@ then uses AI only when verified data is not enough.
                       type="button"
                       onClick={handleAnalyze}
                       disabled={
-                        mode === "image" ? !selectedFile : barcode.trim().length === 0
+                        isAnalyzing ||
+                        (mode === "image"
+                          ? !selectedFile
+                          : barcode.trim().length === 0)
                       }
                       className="px-10 py-4 bg-on-surface text-white rounded-full font-bold hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -620,11 +378,12 @@ then uses AI only when verified data is not enough.
 
             <div className="flex flex-col items-center pt-1 gap-2">
               <p className="text-xs text-on-surface-variant font-medium opacity-70">
-                Typical analysis takes a few seconds depending on OCR and AI response time.
+                Typical analysis takes a few seconds depending on OCR and AI
+                response time.
               </p>
               <p className="text-xs text-on-surface-variant opacity-70 text-center max-w-2xl">
-                Privacy note: uploads may contain health-related information. Only send what
-                you intend to analyze and save.
+                Privacy note: uploads may contain health-related information.
+                Only send what you intend to analyze and save.
               </p>
             </div>
           </motion.div>
@@ -639,8 +398,9 @@ then uses AI only when verified data is not enough.
               <div className="mb-6 rounded-[22px] bg-amber-50 border border-amber-100 p-4 flex items-start gap-3 text-amber-800">
                 <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0" />
                 <div className="text-sm leading-relaxed">
-                  OCR confidence looks low. Review the extracted text carefully and consider
-                  retaking the image with better lighting or framing.
+                  OCR confidence looks low. Review the extracted text carefully
+                  and consider retaking the image with better lighting or
+                  framing.
                 </div>
               </div>
             ) : null}
@@ -701,7 +461,9 @@ then uses AI only when verified data is not enough.
                     <p className="text-xs text-on-surface-variant font-bold uppercase tracking-wider mb-2">
                       Dosage
                     </p>
-                    <p className="font-medium text-on-surface">{result.dosage}</p>
+                    <p className="font-medium text-on-surface">
+                      {result.dosage}
+                    </p>
                   </div>
 
                   <div className="p-5 bg-yaobox-tertiary-container/25 rounded-2xl">
@@ -709,7 +471,8 @@ then uses AI only when verified data is not enough.
                       Warning
                     </p>
                     <p className="text-sm font-medium text-yaobox-tertiary">
-                      {result.warnings[0] ?? "No warning text was returned by the backend."}
+                      {result.warnings[0] ??
+                        "No warning text was returned by the backend."}
                     </p>
                   </div>
                 </div>
@@ -719,14 +482,18 @@ then uses AI only when verified data is not enough.
                     <p className="text-xs text-on-surface-variant font-bold uppercase tracking-wider mb-2">
                       Usage
                     </p>
-                    <p className="text-on-surface leading-relaxed">{result.usage}</p>
+                    <p className="text-on-surface leading-relaxed">
+                      {result.usage}
+                    </p>
                   </div>
 
                   <div className="p-5 bg-surface-container-low rounded-2xl">
                     <p className="text-xs text-on-surface-variant font-bold uppercase tracking-wider mb-2">
                       Manufacturer
                     </p>
-                    <p className="text-on-surface leading-relaxed">{result.manufacturer}</p>
+                    <p className="text-on-surface leading-relaxed">
+                      {result.manufacturer}
+                    </p>
                   </div>
                 </div>
 
@@ -750,17 +517,17 @@ then uses AI only when verified data is not enough.
 
                 <div className="flex flex-wrap gap-4 pt-2">
                   <Link
-                    to="/reminders/create"
-                    state={{
-                      medicineId: result.barcode !== "Not available" ? result.barcode : "",
-                      medicineName: result.medicineName,
-                      dosageNote: result.dosage,
-                      sourceScanId: result.scanId,
-                    }}
-                    className="px-8 py-4 bg-on-surface text-white rounded-full font-bold hover:opacity-90 active:scale-95 transition-all"
-                  >
-                    Create Reminder
-                  </Link>
+                to="/reminders/create"
+               state={{
+                    medicineId: result.medicineId,
+                    medicineName: result.medicineName,
+                    dosageNote: result.dosage,
+                    sourceScanId: result.scanId,
+                  }}
+  className="px-8 py-4 bg-on-surface text-white rounded-full font-bold hover:opacity-90 active:scale-95 transition-all"
+>
+  Create Reminder
+</Link>
 
                   <Link
                     to="/history"
