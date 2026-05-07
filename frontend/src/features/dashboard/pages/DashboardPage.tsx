@@ -126,7 +126,8 @@ function normalizeHistoryItem(raw: ScanHistoryItem): DashboardHistoryItem {
       raw.translated_text,
       raw.usage,
       raw.dosage,
-      raw.raw_ocr_text
+      raw.raw_ocr_text,
+      raw.raw_text
     ) || "Saved scan result available";
 
   return {
@@ -298,8 +299,8 @@ export default function DashboardPage() {
         </h1>
 
         <p className="text-lg text-slate-600 max-w-2xl leading-relaxed">
-          Keep the main action obvious: scan medicine, review recent results, and
-          stay on top of reminders without drowning the page in noise.
+          Start with a scan, review the latest saved result, and manage active
+          reminders without pretending this is a diagnosis system.
         </p>
 
         <div className="inline-flex items-center gap-2 rounded-full bg-brand-primary-container/40 px-4 py-2 text-sm font-semibold text-brand-on-primary-container">
@@ -341,28 +342,28 @@ export default function DashboardPage() {
             to="/scan"
             icon={<Camera size={24} />}
             title="Scan Medicine"
-            description="Start image upload or camera capture for medicine, prescription, or report."
+            description="Upload or capture a medicine package image for OCR and review."
           />
 
           <ActionCard
             to="/scan"
             icon={<Upload size={24} />}
             title="Upload Prescription"
-            description="Jump straight into the OCR and translation workflow."
+            description="Use the scan flow for prescription/report OCR and explanation."
           />
 
           <ActionCard
             to="/history"
             icon={<History size={24} />}
             title="View History"
-            description="Reopen prior scans and review translated details."
+            description="Reopen prior scans and inspect OCR text, explanation, and trust notes."
           />
 
           <ActionCard
             to="/reminders"
             icon={<BellRing size={24} />}
             title="Reminder Center"
-            description="Check schedules, edit active reminders, and manage follow-up."
+            description="Create, activate, deactivate, and delete medication reminders."
           />
         </div>
       </section>
@@ -371,7 +372,7 @@ export default function DashboardPage() {
         <div className="grid lg:grid-cols-[1.2fr_0.8fr] gap-0">
           <div className="p-8 lg:p-12 flex flex-col justify-center">
             <span className="inline-block px-3 py-1 bg-brand-primary/10 text-brand-primary text-xs font-bold rounded-full mb-6 w-fit">
-              TRUST BANNER
+              SAFETY BOUNDARY
             </span>
 
             <h3 className="text-3xl font-bold mb-4 tracking-tight text-slate-900">
@@ -379,10 +380,10 @@ export default function DashboardPage() {
             </h3>
 
             <p className="text-slate-600 mb-6 leading-relaxed max-w-2xl">
-              This product is for understanding Chinese medicine information and
-              managing your own records. It can extract text, translate it, explain
-              it, save it, and help you create reminders. It is not a diagnosis
-              engine and it should not pretend otherwise.
+              YAOBOX helps users understand Chinese medicine information and
+              manage records. It can extract text, translate it, explain it,
+              save it, and help create reminders. It cannot diagnose disease,
+              confirm personal safety, or replace a doctor or pharmacist.
             </p>
 
             <div className="flex flex-wrap gap-3">
