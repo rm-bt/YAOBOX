@@ -1,11 +1,16 @@
+import logging
 import os
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
+
+from app.api.routes.auth import get_current_user
+from app.models.user import User
 
 try:
     from google import genai
+
     GENAI_IMPORT_ERROR = ""
 except Exception as exc:
     genai = None
@@ -14,13 +19,28 @@ except Exception as exc:
 
 router = APIRouter()
 
+logger = logging.getLogger(__name__)
+
 MAX_ASSISTANT_QUESTION_LENGTH = 500
 MAX_ASSISTANT_CONTEXT_LENGTH = 700
 MAX_ASSISTANT_RESPONSE_CHARS = 1800
 
 SAFETY_NOTE = (
-    "YAOBOX can explain general health and medicine information, but it does not "
-    "diagnose disease, prescribe treatment, or replace a doctor or pharmacist."
+    "YAOBOX provides general medicine-understanding support only. It does not "
+    "diagnose disease, prescribe treatment, confirm medicine safety, or replace "
+    "a doctor or pharmacist."
+)
+
+SAFE_FALLBACK_ANSWER = (
+    "I cannot generate a full AI answer right now.\n\n"
+    "General safety guidance:\n"
+    "- Follow the medicine label and instructions from a doctor or pharmacist.\n"
+    "- Do not start, stop, mix, or change medicine doses based only on this app.\n"
+    "- If the medicine label is unclear, ask a pharmacist to confirm dosage, timing, "
+    "contraindications, and side effects.\n"
+    "- If symptoms are severe, worsening, unusual, or urgent, seek medical help instead "
+    "of using this assistant.\n\n"
+    "This response is a safe fallback, not medical advice."
 )
 
 
@@ -64,45 +84,41 @@ def shorten_answer(answer: str) -> str:
 
     return (
         answer[:MAX_ASSISTANT_RESPONSE_CHARS].rstrip()
-        + "\n\n[Answer shortened to reduce API usage.]"
+        + "\n\n[Answer shortened for safety and readability.]"
     )
 
 
-def fallback_answer(question: str, reason: str) -> str:
-    answer = (
-        "I can give general wellness guidance, but the Gemini AI service is not available right now.\n\n"
-        f"Technical reason: {reason}\n\n"
-        "General advice:\n"
-        "- Follow the medicine label or doctor/pharmacist instructions.\n"
-        "- Avoid mixing medicines without professional advice.\n"
-        "- Keep a simple routine for sleep, hydration, meals, and medication timing.\n"
-        "- If symptoms are severe, worsening, or unusual, contact a healthcare professional.\n\n"
-        f"Your question was: {question}"
-    )
-
-    return shorten_answer(answer)
+def fallback_answer(reason: str) -> str:
+    logger.warning("Assistant fallback used: %s", reason)
+    return SAFE_FALLBACK_ANSWER
 
 
 def build_prompt(question: str, context: str | None) -> str:
     return f"""
-You are YAOBOX Medicine & Wellness Assistant.
+You are YAOBOX Medicine Understanding Assistant.
 
-Your job:
-- Explain general health and medicine information in simple language.
-- Give safe lifestyle and habit advice.
-- Mention bad habits that may worsen common health problems.
-- Suggest when the user should contact a doctor or pharmacist.
-- Stay cautious and honest.
+Purpose:
+- Help foreign users in China understand medicine-related information in simple English.
+- Explain general medicine-label concepts, safer routines, reminder habits, and when to ask a professional.
+- Stay within general educational support.
 
-Rules:
+Hard safety rules:
 - Do NOT diagnose the user.
 - Do NOT prescribe medication.
-- Do NOT tell the user to stop or change prescribed medicine.
-- Do NOT claim certainty about diseases.
-- For emergency symptoms, tell the user to seek urgent medical help.
-- Keep the answer useful for a normal patient, not overly technical.
-- Use short sections and clear bullets.
-- Keep the answer under 250 words unless the user asks for more detail.
+- Do NOT recommend a dose.
+- Do NOT tell the user to start, stop, replace, combine, or change medication.
+- Do NOT claim a medicine is safe for the user personally.
+- Do NOT claim certainty from OCR, AI translation, or incomplete user context.
+- For emergency symptoms, tell the user to seek urgent medical help immediately.
+- If the question needs personal medical judgment, tell the user to ask a doctor or pharmacist.
+- If information is missing or unclear, say so directly.
+
+Answer style:
+- English only.
+- Short sections.
+- Clear bullets.
+- Under 250 words unless the user asks for more detail.
+- Include a short caution at the end when medicine decisions are involved.
 
 Optional user context:
 {context or "No extra context provided."}
@@ -113,7 +129,10 @@ User question:
 
 
 @router.post("/chat", response_model=AssistantResponse)
-def chat_with_assistant(payload: AssistantRequest):
+def chat_with_assistant(
+    payload: AssistantRequest,
+    current_user: User = Depends(get_current_user),
+):
     load_backend_env()
 
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
@@ -121,19 +140,13 @@ def chat_with_assistant(payload: AssistantRequest):
 
     if not api_key:
         return AssistantResponse(
-            answer=fallback_answer(
-                payload.question,
-                "GEMINI_API_KEY was not loaded. Check backend/.env and restart uvicorn.",
-            ),
+            answer=fallback_answer("GEMINI_API_KEY is missing."),
             safety_note=SAFETY_NOTE,
         )
 
     if genai is None:
         return AssistantResponse(
-            answer=fallback_answer(
-                payload.question,
-                f"google-genai import failed: {GENAI_IMPORT_ERROR}",
-            ),
+            answer=fallback_answer(f"google-genai import failed: {GENAI_IMPORT_ERROR}"),
             safety_note=SAFETY_NOTE,
         )
 
@@ -148,12 +161,9 @@ def chat_with_assistant(payload: AssistantRequest):
         answer = getattr(response, "text", None)
 
         if not answer:
-            answer = fallback_answer(
-                payload.question,
-                "Gemini returned an empty response.",
-            )
+            answer = fallback_answer("Gemini returned an empty response.")
         else:
-            answer = shorten_answer(answer)
+            answer = shorten_answer(answer.strip())
 
         return AssistantResponse(
             answer=answer,
@@ -162,9 +172,6 @@ def chat_with_assistant(payload: AssistantRequest):
 
     except Exception as exc:
         return AssistantResponse(
-            answer=fallback_answer(
-                payload.question,
-                f"{type(exc).__name__}: {exc}",
-            ),
+            answer=fallback_answer(f"{type(exc).__name__}: {exc}"),
             safety_note=SAFETY_NOTE,
         )
