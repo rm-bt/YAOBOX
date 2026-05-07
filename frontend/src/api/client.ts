@@ -3,7 +3,7 @@ import { env } from "../app/config/env";
 import { useAuthStore } from "../features/auth/store/auth.store";
 
 export const apiClient = axios.create({
-  baseURL: env.apiBaseUrl
+  baseURL: env.apiBaseUrl,
 });
 
 apiClient.interceptors.request.use((config) => {
@@ -15,3 +15,16 @@ apiClient.interceptors.request.use((config) => {
 
   return config;
 });
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+
+    if (status === 401) {
+      useAuthStore.getState().clearSession();
+    }
+
+    return Promise.reject(error);
+  }
+);
