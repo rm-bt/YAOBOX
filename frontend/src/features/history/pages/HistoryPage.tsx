@@ -145,13 +145,13 @@ function normalizeHistoryItem(raw: ScanHistoryItem): HistoryItem {
       firstNonEmptyString(raw.translated_text, raw.usage) ||
       "English explanation not available.",
     extractedText:
-      firstNonEmptyString(raw.raw_ocr_text) ||
-      "Original extracted text not available.",
+  firstNonEmptyString(raw.raw_ocr_text, raw.raw_text) ||
+  "Original extracted text not available.",
     dosage:
       firstNonEmptyString(raw.dosage, raw.usage) ||
       "Dosage not extracted clearly.",
     warnings: asWarningList(raw.warnings),
-    imageUrl: buildImageUrl(raw.image_path),
+    imageUrl: buildImageUrl(raw.image_url || raw.image_path),
     barcode: firstNonEmptyString(raw.barcode) || "Not available",
     matchStatus: firstNonEmptyString(raw.match_status) || "unknown",
     trustNotes:

@@ -10,27 +10,75 @@ from app.schemas.history import HistoryResponse
 router = APIRouter(prefix="/history", tags=["History"])
 
 
-def build_history_response(scan: ScanRecord) -> dict:
-    image_url = None
+def build_image_url(image_path: str | None) -> str | None:
+    if not image_path:
+        return None
+
+    normalized = image_path.replace("\\", "/")
+
+    if normalized.startswith("http://") or normalized.startswith("https://"):
+        return normalized
+
+    if normalized.startswith("/uploads/"):
+        return normalized
+
+    if normalized.startswith("uploads/"):
+        return f"/{normalized}"
+
+    return f"/uploads/{normalized.split('/')[-1]}"
+
+
+def normalize_source_type(scan: ScanRecord) -> str:
+    if scan.source_type:
+        return scan.source_type
+
     if scan.image_path:
-        normalized = scan.image_path.replace("\\", "/")
-        if normalized.startswith("uploads/"):
-            image_url = f"/{normalized}"
-        else:
-            image_url = f"/uploads/{normalized.split('/')[-1]}"
+        return "image_upload"
+
+    if scan.barcode:
+        return "barcode"
+
+    return "manual_entry"
+
+
+def normalize_match_status(scan: ScanRecord) -> str:
+    if scan.match_status:
+        return scan.match_status
+
+    if scan.medicine_name:
+        return "identified"
+
+    if scan.raw_ocr_text:
+        return "ocr_extracted"
+
+    return "saved"
+
+
+def build_history_response(scan: ScanRecord) -> dict:
+    image_url = build_image_url(scan.image_path)
 
     return {
         "id": scan.id,
-        "medicine_name": scan.medicine_name,
+        "user_id": scan.user_id,
+        "image_path": scan.image_path,
+        "image_url": image_url,
         "barcode": scan.barcode,
-        "translated_text": scan.translated_text,
+        "medicine_id": scan.medicine_id,
+        "medicine_name": scan.medicine_name,
+        "raw_ocr_text": scan.raw_ocr_text,
         "raw_text": scan.raw_ocr_text,
+        "translated_text": scan.translated_text,
         "manufacturer": scan.manufacturer,
         "usage": scan.usage,
         "dosage": scan.dosage,
-        "image_url": image_url,
-        "source_type": "image_upload" if scan.image_path else "manual_entry",
-        "match_status": "identified" if scan.medicine_name else "saved",
+        "warnings": scan.warnings,
+        "source_type": normalize_source_type(scan),
+        "match_status": normalize_match_status(scan),
+        "ocr_status": scan.ocr_status,
+        "ai_status": scan.ai_status,
+        "ocr_confidence": scan.ocr_confidence,
+        "ai_confidence": scan.ai_confidence,
+        "trust_notes": scan.trust_notes,
         "created_at": scan.created_at,
     }
 

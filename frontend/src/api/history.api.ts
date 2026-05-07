@@ -3,16 +3,23 @@ import { apiClient } from "./client";
 export type ScanHistoryItem = {
   id: number;
   user_id: number;
+
   image_path?: string | null;
+  image_url?: string | null;
+
   barcode?: string | null;
   medicine_id?: number | null;
   medicine_name?: string | null;
+
   raw_ocr_text?: string | null;
+  raw_text?: string | null;
   translated_text?: string | null;
+
   manufacturer?: string | null;
   usage?: string | null;
   dosage?: string | null;
   warnings?: string | null;
+
   source_type?: string | null;
   match_status?: string | null;
   ocr_status?: string | null;
@@ -20,6 +27,7 @@ export type ScanHistoryItem = {
   ocr_confidence?: number | null;
   ai_confidence?: string | null;
   trust_notes?: string | null;
+
   created_at: string;
 };
 
