@@ -7,14 +7,12 @@ import {
   BellRing,
   Camera,
   EyeOff,
-  Globe2,
   History,
   LogOut,
   Pill,
   QrCode,
   Scan,
   ShieldCheck,
-  UserRound,
 } from "lucide-react";
 
 import { env } from "../../../app/config/env";
@@ -131,7 +129,8 @@ export default function ProfilePage() {
   const navigate = useNavigate();
   const clearSession = useAuthStore((state) => state.clearSession);
   const storedToken = useAuthStore((state) => state.token);
-const { avatarId, avatar, setAvatarId } = useAvatar();
+  const { avatarId, avatar, setAvatarId } = useAvatar();
+
   const decodedToken = useMemo(() => decodeJwtPayload(storedToken), [storedToken]);
 
   const profileQuery = useQuery({
@@ -218,8 +217,8 @@ const { avatarId, avatar, setAvatarId } = useAvatar();
             Welcome back, {firstName}
           </h1>
           <p className="text-slate-600 max-w-xl">
-            Keep personal details visible, account access clear, and recent activity
-            easy to revisit.
+            Keep personal details visible, account access clear, and recent
+            activity easy to revisit.
           </p>
         </motion.div>
 
@@ -234,12 +233,13 @@ const { avatarId, avatar, setAvatarId } = useAvatar();
 
       {!storedToken ? (
         <div className="rounded-[24px] border border-amber-100 bg-amber-50 px-5 py-4 text-sm text-amber-800 leading-relaxed">
-          You are not signed in. Log in again so profile, history, and reminders can load.
+          You are not signed in. Log in again so profile, history, and reminders
+          can load.
         </div>
       ) : profileQuery.isError ? (
         <div className="rounded-[24px] border border-amber-100 bg-amber-50 px-5 py-4 text-sm text-amber-800 leading-relaxed">
-          Profile data could not be loaded. The page is using token fallback data where
-          possible.
+          Profile data could not be loaded. The page is using token fallback data
+          where possible.
         </div>
       ) : null}
 
@@ -247,38 +247,48 @@ const { avatarId, avatar, setAvatarId } = useAvatar();
         {[
           {
             label: "Total Scans",
-            value: historyQuery.isLoading ? "..." : String(historyQuery.data?.length ?? 0),
+            value: historyQuery.isLoading
+              ? "..."
+              : String(historyQuery.data?.length ?? 0),
             icon: Scan,
             color: "bg-brand-primary-container/40 text-brand-on-primary-container",
           },
           {
             label: "Active Reminders",
-            value: remindersQuery.isLoading ? "..." : String(activeReminders.length),
+            value: remindersQuery.isLoading
+              ? "..."
+              : String(activeReminders.length),
             icon: BellRing,
             color: "bg-brand-tertiary-container/40 text-brand-tertiary",
           },
           {
             label: "Medicines Tracked",
-            value: historyQuery.isLoading ? "..." : String(trackedMedicineCount),
+            value: historyQuery.isLoading
+              ? "..."
+              : String(trackedMedicineCount),
             icon: Pill,
             color: "bg-slate-100 text-slate-700",
           },
-        ].map((stat, idx) => (
+        ].map((stat, index) => (
           <motion.div
             key={stat.label}
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: idx * 0.08 }}
+            transition={{ delay: index * 0.08 }}
             className="bg-white border border-slate-100 rounded-[28px] p-6 flex flex-col gap-4 shadow-sm"
           >
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${stat.color}`}>
+            <div
+              className={`w-10 h-10 rounded-full flex items-center justify-center ${stat.color}`}
+            >
               <stat.icon className="w-5 h-5" />
             </div>
             <div>
               <p className="text-xs uppercase tracking-wider text-slate-500 font-medium">
                 {stat.label}
               </p>
-              <p className="text-3xl font-semibold text-slate-900">{stat.value}</p>
+              <p className="text-3xl font-semibold text-slate-900">
+                {stat.value}
+              </p>
             </div>
           </motion.div>
         ))}
@@ -292,64 +302,81 @@ const { avatarId, avatar, setAvatarId } = useAvatar();
             className="bg-white border border-slate-100 rounded-[28px] p-6 shadow-sm relative overflow-hidden flex flex-col items-center text-center"
           >
             <div className="absolute top-0 left-0 w-full h-20 bg-brand-primary-container/40" />
+
             <div
-  className={`w-24 h-24 rounded-full border-4 border-white mt-6 z-10 ${avatar.bgClass} flex items-center justify-center shadow-md text-5xl`}
-  title={`Avatar: ${avatar.label}`}
->
-  <span aria-hidden="true">{avatar.emoji}</span>
-  <span className="sr-only">Selected avatar: {avatar.label}</span>
-</div>
+              className={`w-24 h-24 rounded-full border-4 border-white mt-6 z-10 ${avatar.bgClass} flex items-center justify-center shadow-md text-5xl`}
+              title={`Avatar: ${avatar.label}`}
+            >
+              <span aria-hidden="true">{avatar.emoji}</span>
+              <span className="sr-only">Selected avatar: {avatar.label}</span>
+            </div>
 
             <div className="mt-4 w-full">
-              <h3 className="text-2xl font-semibold text-slate-900">{fullName}</h3>
+              <h3 className="text-2xl font-semibold text-slate-900">
+                {fullName}
+              </h3>
               <p className="text-slate-500 text-sm mb-6">{email}</p>
 
               <div className="text-left bg-slate-50 rounded-[20px] p-4 mb-4 border border-slate-100">
-  <p className="text-xs text-slate-500 mb-3 font-medium">
-    Choose avatar
-  </p>
+                <p className="text-xs text-slate-500 mb-3 font-medium">
+                  Choose avatar
+                </p>
 
-  <div className="grid grid-cols-3 gap-3">
-    {AVATAR_OPTIONS.map((option) => {
-      const isSelected = option.id === avatarId;
+                <div className="grid grid-cols-3 gap-3">
+                  {AVATAR_OPTIONS.map((option) => {
+                    const isSelected = option.id === avatarId;
 
-      return (
-        <button
-          key={option.id}
-          type="button"
-          onClick={() => setAvatarId(option.id)}
-          className={[
-            "flex flex-col items-center justify-center gap-2 rounded-[18px] border px-3 py-3 transition-all",
-            isSelected
-              ? "border-brand-primary bg-white shadow-sm ring-2 ring-brand-primary/20"
-              : "border-slate-200 bg-white/60 hover:bg-white hover:border-slate-300",
-          ].join(" ")}
-          title={option.label}
-        >
-          <span
-            className={`flex h-11 w-11 items-center justify-center rounded-full ${option.bgClass} text-2xl`}
-            aria-hidden="true"
-          >
-            {option.emoji}
-          </span>
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => setAvatarId(option.id)}
+                        className={[
+                          "flex flex-col items-center justify-center gap-2 rounded-[18px] border px-3 py-3 transition-all",
+                          isSelected
+                            ? "border-brand-primary bg-white shadow-sm ring-2 ring-brand-primary/20"
+                            : "border-slate-200 bg-white/60 hover:bg-white hover:border-slate-300",
+                        ].join(" ")}
+                        title={option.label}
+                      >
+                        <span
+                          className={`flex h-11 w-11 items-center justify-center rounded-full ${option.bgClass} text-2xl`}
+                          aria-hidden="true"
+                        >
+                          {option.emoji}
+                        </span>
 
-          <span className="text-[11px] font-semibold text-slate-600 text-center leading-tight">
-            {option.label}
-          </span>
-        </button>
-      );
-    })}
-  </div>
+                        <span className="text-[11px] font-semibold text-slate-600 text-center leading-tight">
+                          {option.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
 
-  <p className="mt-3 text-xs text-slate-500 leading-relaxed">
-    This avatar is saved on this browser and appears in the top profile icon.
-  </p>
-</div>
+                <p className="mt-3 text-xs text-slate-500 leading-relaxed">
+                  This avatar is saved on this browser and appears in the top
+                  profile icon.
+                </p>
+              </div>
+
+              <div className="text-left bg-slate-50 rounded-[20px] p-4 mb-4 border border-slate-100">
+                <p className="text-xs text-slate-500 mb-1 font-medium">
+                  Language preference
+                </p>
+                <p className="text-sm font-semibold text-slate-900">
+                  {languagePref}
+                </p>
+              </div>
 
               <div className="text-left bg-slate-50 rounded-[20px] p-4 mb-6 border border-slate-100">
-                <p className="text-xs text-slate-500 mb-1 font-medium">Password</p>
+                <p className="text-xs text-slate-500 mb-1 font-medium">
+                  Password
+                </p>
                 <div className="flex justify-between items-center">
-                  <p className="font-mono tracking-widest text-slate-900">••••••••••</p>
+                  <p className="font-mono tracking-widest text-slate-900">
+                    ••••••••••
+                  </p>
                   <EyeOff className="w-4 h-4 text-slate-400" />
                 </div>
               </div>
@@ -360,7 +387,7 @@ const { avatarId, avatar, setAvatarId } = useAvatar();
                   className="w-full bg-transparent border border-brand-secondary text-brand-secondary py-3 rounded-full hover:bg-slate-50 transition-all font-medium text-sm"
                   disabled
                 >
-                  Edit Profile
+                  Edit Profile Deferred
                 </button>
 
                 <button
@@ -376,7 +403,9 @@ const { avatarId, avatar, setAvatarId } = useAvatar();
           </motion.div>
 
           <div className="flex flex-col gap-3">
-            <h3 className="text-lg font-semibold text-slate-900 ml-1">Quick Actions</h3>
+            <h3 className="text-lg font-semibold text-slate-900 ml-1">
+              Quick Actions
+            </h3>
 
             <Link
               to="/scan"
@@ -385,7 +414,7 @@ const { avatarId, avatar, setAvatarId } = useAvatar();
               <div className="w-10 h-10 rounded-full bg-brand-primary-container/40 text-brand-on-primary-container flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
                 <Camera className="w-5 h-5" />
               </div>
-              <span>Upload Medication Report</span>
+              <span>Upload medicine image or report</span>
             </Link>
 
             <Link
@@ -395,7 +424,7 @@ const { avatarId, avatar, setAvatarId } = useAvatar();
               <div className="w-10 h-10 rounded-full bg-brand-tertiary-container/40 text-brand-tertiary flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
                 <AlarmPlus className="w-5 h-5" />
               </div>
-              <span>Add Smart Reminder</span>
+              <span>Add medication reminder</span>
             </Link>
 
             <div className="rounded-[22px] bg-white border border-slate-100 p-4 shadow-sm">
@@ -408,8 +437,8 @@ const { avatarId, avatar, setAvatarId } = useAvatar();
                     Security status
                   </p>
                   <p className="text-sm text-slate-500 mt-1 leading-relaxed">
-                    Session handling is centralized. Password change remains deferred
-                    until the documented backend route exists.
+                    Session handling is centralized. Password change remains
+                    deferred until the documented backend route exists.
                   </p>
                 </div>
               </div>
@@ -423,7 +452,9 @@ const { avatarId, avatar, setAvatarId } = useAvatar();
           className="lg:col-span-8 bg-white border border-slate-100 rounded-[28px] p-6 shadow-sm"
         >
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-semibold text-slate-900">Recent Activity</h3>
+            <h3 className="text-xl font-semibold text-slate-900">
+              Recent Activity
+            </h3>
             <Link
               to="/history"
               className="text-brand-primary text-sm font-medium hover:underline flex items-center gap-1"
@@ -452,12 +483,12 @@ const { avatarId, avatar, setAvatarId } = useAvatar();
             </div>
           ) : (
             <div className="flex flex-col gap-4">
-              {historyItems.map((item, idx) => (
+              {historyItems.map((item, index) => (
                 <motion.div
                   key={item.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 + idx * 0.08 }}
+                  transition={{ delay: 0.2 + index * 0.08 }}
                   className="flex items-center gap-4 p-4 border border-slate-100 rounded-[22px] hover:border-brand-primary-container/60 hover:bg-slate-50 transition-all"
                 >
                   <div className="w-16 h-16 rounded-xl bg-slate-100 flex items-center justify-center overflow-hidden shrink-0 border border-slate-100">
@@ -497,8 +528,8 @@ const { avatarId, avatar, setAvatarId } = useAvatar();
       </div>
 
       <div className="text-xs text-slate-500 leading-relaxed max-w-3xl">
-        This profile page now reads from the shared API client:
-        <code> GET /users/me</code>, <code>GET /history/</code>, and
+        This profile page reads from the shared API client:
+        <code> GET /users/me</code>, <code> GET /history/</code>, and
         <code> GET /reminders/</code>.
       </div>
     </div>

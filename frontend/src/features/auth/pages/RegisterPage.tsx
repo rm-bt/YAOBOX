@@ -22,7 +22,7 @@ export default function RegisterPage() {
     terms: false,
   });
 
-  function handleSubmit(event: FormEvent) {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!formData.terms) {
@@ -30,8 +30,8 @@ export default function RegisterPage() {
     }
 
     registerMutation.mutate({
-      full_name: formData.fullName,
-      email: formData.email,
+      full_name: formData.fullName.trim(),
+      email: formData.email.trim(),
       password: formData.password,
     });
   }
@@ -41,7 +41,10 @@ export default function RegisterPage() {
       <header className="w-full max-w-7xl mx-auto px-6 py-8 flex justify-between items-center z-20">
         <Link to="/" className="flex items-center gap-3">
           <div className="w-10 h-10 bg-[#e1ecd6] rounded-full flex items-center justify-center">
-            <Pill className="w-6 h-6 text-[#454d3d] -rotate-45" strokeWidth={2.5} />
+            <Pill
+              className="w-6 h-6 text-[#454d3d] -rotate-45"
+              strokeWidth={2.5}
+            />
           </div>
           <span className="text-2xl font-bold tracking-tight text-[#1a1c19]">
             Yaobox
@@ -74,7 +77,10 @@ export default function RegisterPage() {
         >
           <div className="text-center mb-10 flex flex-col items-center">
             <div className="w-16 h-16 bg-[#e1ecd6] rounded-full flex items-center justify-center mb-6">
-              <Pill className="w-8 h-8 text-[#454d3d] -rotate-45" strokeWidth={2.5} />
+              <Pill
+                className="w-8 h-8 text-[#454d3d] -rotate-45"
+                strokeWidth={2.5}
+              />
             </div>
 
             <h1 className="text-3xl font-bold text-stone-900 mb-2 leading-tight">
@@ -83,7 +89,7 @@ export default function RegisterPage() {
 
             <p className="text-stone-500 leading-relaxed text-sm max-w-[280px] mx-auto text-center">
               Bridge the language gap in healthcare. Identify Chinese medicine
-              packages and translate medical reports instantly.
+              packages and translate medical reports clearly.
             </p>
 
             <div className="mt-5 rounded-2xl bg-[#f8faf6] border border-[#d9e9c6] px-4 py-3 text-left w-full">
@@ -100,52 +106,75 @@ export default function RegisterPage() {
 
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div className="space-y-1.5 text-left">
-              <label className="text-sm font-semibold text-stone-800 ml-1">
+              <label
+                htmlFor="fullName"
+                className="text-sm font-semibold text-stone-800 ml-1"
+              >
                 Full Name
               </label>
               <input
+                id="fullName"
                 type="text"
                 placeholder="Enter your full name"
                 className="w-full bg-white border border-stone-200 rounded-2xl px-5 py-4 focus:outline-none focus:ring-2 focus:ring-brand-primary/10 focus:border-brand-primary transition-all text-stone-900 placeholder:text-stone-300"
                 required
                 value={formData.fullName}
-                onChange={(e) =>
-                  setFormData({ ...formData, fullName: e.target.value })
+                onChange={(event) =>
+                  setFormData((current) => ({
+                    ...current,
+                    fullName: event.target.value,
+                  }))
                 }
               />
             </div>
 
             <div className="space-y-1.5 text-left">
-              <label className="text-sm font-semibold text-stone-800 ml-1">
+              <label
+                htmlFor="email"
+                className="text-sm font-semibold text-stone-800 ml-1"
+              >
                 Email Address
               </label>
               <input
+                id="email"
                 type="email"
                 placeholder="you@example.com"
+                autoComplete="email"
                 className="w-full bg-white border border-stone-200 rounded-2xl px-5 py-4 focus:outline-none focus:ring-2 focus:ring-brand-primary/10 focus:border-brand-primary transition-all text-stone-900 placeholder:text-stone-300"
                 required
                 value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
+                onChange={(event) =>
+                  setFormData((current) => ({
+                    ...current,
+                    email: event.target.value,
+                  }))
                 }
               />
             </div>
 
             <div className="space-y-1.5 text-left">
-              <label className="text-sm font-semibold text-stone-800 ml-1">
+              <label
+                htmlFor="password"
+                className="text-sm font-semibold text-stone-800 ml-1"
+              >
                 Password
               </label>
 
               <div className="relative">
                 <input
+                  id="password"
                   type={showPassword ? "text" : "password"}
                   placeholder="Create a password"
+                  autoComplete="new-password"
                   className="w-full bg-white border border-stone-200 rounded-2xl px-5 py-4 pr-12 focus:outline-none focus:ring-2 focus:ring-brand-primary/10 focus:border-brand-primary transition-all text-stone-900 placeholder:text-stone-300"
                   required
                   minLength={8}
                   value={formData.password}
-                  onChange={(e) =>
-                    setFormData({ ...formData, password: e.target.value })
+                  onChange={(event) =>
+                    setFormData((current) => ({
+                      ...current,
+                      password: event.target.value,
+                    }))
                   }
                 />
 
@@ -167,47 +196,41 @@ export default function RegisterPage() {
             <div className="flex items-start gap-4 py-2 text-left">
               <div className="relative flex items-center h-5 mt-0.5">
                 <input
+                  id="terms"
                   type="checkbox"
                   className="w-5 h-5 rounded-full border-stone-300 text-brand-primary focus:ring-brand-primary/20 cursor-pointer appearance-none checked:bg-brand-primary checked:border-transparent ring-1 ring-stone-200 checked:ring-brand-primary"
                   required
                   checked={formData.terms}
-                  onChange={(e) =>
-                    setFormData({ ...formData, terms: e.target.checked })
+                  onChange={(event) =>
+                    setFormData((current) => ({
+                      ...current,
+                      terms: event.target.checked,
+                    }))
                   }
                 />
-                {formData.terms && (
+                {formData.terms ? (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <div className="w-2 h-2 bg-white rounded-full" />
                   </div>
-                )}
+                ) : null}
               </div>
 
-              <label className="text-xs text-stone-500 leading-normal cursor-pointer">
-                I agree to the{" "}
-                <button
-                  type="button"
-                  className="text-brand-primary font-bold hover:underline"
-                >
-                  Terms of Service
-                </button>{" "}
-                and{" "}
-                <button
-                  type="button"
-                  className="text-brand-primary font-bold hover:underline"
-                >
-                  Privacy Policy
-                </button>
-                .
+              <label
+                htmlFor="terms"
+                className="text-xs text-stone-500 leading-normal cursor-pointer"
+              >
+                I understand that YAOBOX is a medicine information tool, not a
+                diagnosis or treatment system.
               </label>
             </div>
 
             {registerMutation.isError ? (
-  <div className="rounded-2xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700 leading-relaxed">
-    {registerMutation.error instanceof Error
-      ? registerMutation.error.message
-      : "Registration failed. Check backend connection and submitted data."}
-  </div>
-) : null}
+              <div className="rounded-2xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700 leading-relaxed">
+                {registerMutation.error instanceof Error
+                  ? registerMutation.error.message
+                  : "Registration failed. Check backend connection and submitted data."}
+              </div>
+            ) : null}
 
             {registerMutation.isSuccess ? (
               <div className="rounded-2xl bg-emerald-50 border border-emerald-100 px-4 py-3 text-sm text-emerald-700 leading-relaxed flex items-start gap-2">
@@ -221,10 +244,12 @@ export default function RegisterPage() {
 
             <button
               type="submit"
-              disabled={registerMutation.isPending}
+              disabled={registerMutation.isPending || !formData.terms}
               className="w-full bg-[#635d5a] text-white font-bold rounded-full py-5 flex items-center justify-center gap-2 hover:bg-stone-800 transition-all shadow-xl shadow-stone-100 disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              {registerMutation.isPending ? "Creating Account..." : "Create Account"}
+              {registerMutation.isPending
+                ? "Creating Account..."
+                : "Create Account"}
               <ArrowRight size={20} />
             </button>
           </form>
@@ -235,7 +260,7 @@ export default function RegisterPage() {
             </div>
             <div className="relative flex justify-center text-[11px] font-bold">
               <span className="bg-white px-6 text-stone-400 uppercase tracking-widest">
-                Not enabled in this build
+                External sign-in not enabled in this build
               </span>
             </div>
           </div>
@@ -274,28 +299,16 @@ export default function RegisterPage() {
 
       <footer className="w-full max-w-7xl mx-auto px-10 py-12 flex flex-col md:flex-row justify-between items-center gap-6 border-t border-stone-200/60 z-20">
         <p className="text-sm text-stone-500 font-medium">
-          © 2024 Yaobox Healthcare. Precision meets wellness.
+          © 2024 Yaobox. Medicine understanding, not medical diagnosis.
         </p>
 
         <div className="flex gap-10">
-          <button
-            type="button"
-            className="text-sm text-stone-500 hover:text-stone-900 transition-colors font-medium underline underline-offset-4 decoration-stone-200"
-          >
-            Privacy Policy
-          </button>
-          <button
-            type="button"
-            className="text-sm text-stone-500 hover:text-stone-900 transition-colors font-medium underline underline-offset-4 decoration-stone-200"
-          >
-            Terms of Service
-          </button>
-          <button
-            type="button"
-            className="text-sm text-stone-500 hover:text-stone-900 transition-colors font-medium underline underline-offset-4 decoration-stone-200"
-          >
-            Help Center
-          </button>
+          <span className="text-sm text-stone-500 font-medium">
+            Privacy-first scan history
+          </span>
+          <span className="text-sm text-stone-500 font-medium">
+            OCR and AI output require review
+          </span>
         </div>
       </footer>
     </div>
