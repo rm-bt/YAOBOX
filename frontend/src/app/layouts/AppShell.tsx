@@ -16,7 +16,6 @@ import {
   Pill,
   Plus,
   ScanLine,
-  Search,
   Settings,
   UserRound,
 } from "lucide-react";
@@ -32,7 +31,6 @@ const navItems = [
   { to: "/reminders", label: "Reminders", icon: Clock3 },
   { to: "/settings", label: "Settings", icon: Settings },
   { to: "/profile", label: "Profile", icon: UserRound },
-  
 ];
 
 function navClass(isActive: boolean) {
@@ -79,7 +77,7 @@ export function AppShell() {
                 Yaobox
               </div>
               <div className="text-[14px] text-[#66728a]">
-                Clinical Wellness
+                Medicine Understanding
               </div>
             </div>
           </Link>
@@ -107,7 +105,7 @@ export function AppShell() {
               className="flex items-center justify-center gap-3 rounded-full bg-[#6b625d] px-6 py-5 text-lg font-bold text-white shadow-[0_18px_40px_-18px_rgba(107,98,93,0.55)] transition-all hover:brightness-95"
             >
               <Plus className="h-6 w-6" strokeWidth={2.6} />
-              <span>Add Medicine</span>
+              <span>New Scan</span>
             </Link>
 
             <button
@@ -124,23 +122,22 @@ export function AppShell() {
         <div className="min-w-0 flex-1">
           <header className="app-shell-header sticky top-0 z-30 border-b border-[#e7ebdf] bg-[#f6f8f4]/95 backdrop-blur">
             <div className="flex items-center gap-4 px-5 py-5 lg:px-8">
-              <div className="app-shell-search hidden md:flex h-14 w-full max-w-[440px] items-center gap-3 rounded-full border border-[#d9e1ee] bg-white px-5 text-[#7a879d] shadow-sm">
-                <Search className="h-5 w-5" strokeWidth={2.2} />
-                <input
-                  type="text"
-                  placeholder="Search medicines..."
-                  className="w-full border-none bg-transparent text-[15px] font-medium text-[#33415c] outline-none placeholder:text-[#7a879d]"
-                />
+              <div className="hidden md:flex min-h-14 w-full max-w-[560px] items-center rounded-[24px] border border-[#d9e1ee] bg-white px-5 text-[#46536a] shadow-sm">
+                <p className="text-sm font-medium leading-relaxed">
+                  YAOBOX separates verified catalog data, OCR text, and AI
+                  explanation. Review important medicine decisions with a
+                  professional.
+                </p>
               </div>
 
               <div className="ml-auto flex items-center gap-3 lg:gap-5">
-                <button
-                  type="button"
+                <Link
+                  to="/reminders"
                   className="flex h-11 w-11 items-center justify-center rounded-full text-[#70809b] transition-all hover:bg-white hover:text-[#13224a]"
-                  title="Notifications"
+                  title="Reminders"
                 >
                   <Bell className="h-6 w-6" strokeWidth={2.1} />
-                </button>
+                </Link>
 
                 <Link
                   to="/settings"

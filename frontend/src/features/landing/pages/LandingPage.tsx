@@ -1,17 +1,16 @@
 import {
-  Camera,
-  Languages,
-  CheckCircle2,
-  Brain,
-  Bell,
-  History,
-  ShieldCheck,
   ArrowRight,
-  X,
-  Menu,
+  Bell,
+  Brain,
+  Camera,
+  CheckCircle2,
   ChevronRight,
-  Globe,
-  Share2
+  FileText,
+  History,
+  Languages,
+  Menu,
+  ShieldCheck,
+  X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useState } from "react";
@@ -20,7 +19,7 @@ import { ThemeToggle } from "../../../components/ThemeToggle";
 
 const Logo = ({
   className = "h-10",
-  showTagline = false
+  showTagline = false,
 }: {
   className?: string;
   showTagline?: boolean;
@@ -46,50 +45,56 @@ const Logo = ({
 
     {showTagline ? (
       <span className="ml-[52px] mt-1 whitespace-nowrap text-[11px] font-medium tracking-tight text-[#3D4B31]">
-        Scan, Translate, and Track Your Medicine
+        Scan, translate, save, and manage medicine information
       </span>
     ) : null}
   </div>
 );
 
-const Navbar = () => {
+const NAV_ITEMS = [
+  { label: "Features", href: "#features" },
+  { label: "How it works", href: "#how-it-works" },
+  { label: "Safety", href: "#safety" },
+  { label: "Support", href: "#support" },
+];
+
+function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
 
-  const navItems = ["Features", "How it Works", "Pricing", "Support"];
-  
-
   return (
-    
     <nav className="fixed top-0 z-50 w-full border-b border-brand-primary/5 bg-brand-surface/80 backdrop-blur-md">
       <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6">
-        <Link to="/">
+        <Link to="/" aria-label="Go to Yaobox landing page">
           <Logo className="h-10 origin-left scale-75 transform md:scale-90" />
-          
         </Link>
 
         <div className="hidden items-center gap-8 md:flex">
-          {navItems.map((item) => (
+          {NAV_ITEMS.map((item) => (
             <a
-              key={item}
-              href={`#${item.toLowerCase().replace(/\s+/g, "-")}`}
+              key={item.href}
+              href={item.href}
               className="text-sm font-medium text-brand-muted transition-colors hover:text-brand-primary"
             >
-              {item}
+              {item.label}
             </a>
           ))}
 
-          
-<ThemeToggle compact />
+          <ThemeToggle compact />
+
           <Link
             to="/register"
             className="pill-button bg-brand-secondary text-white shadow-md hover:bg-brand-secondary/90"
           >
-             
             Get Started
           </Link>
         </div>
 
-        <button className="md:hidden" onClick={() => setIsOpen(!isOpen)}>
+        <button
+          type="button"
+          className="md:hidden"
+          onClick={() => setIsOpen((value) => !value)}
+          aria-label="Toggle navigation menu"
+        >
           {isOpen ? <X /> : <Menu />}
         </button>
       </div>
@@ -103,13 +108,14 @@ const Navbar = () => {
             className="overflow-hidden border-b border-brand-primary/5 bg-white md:hidden"
           >
             <div className="flex flex-col gap-6 px-6 py-8">
-              {navItems.map((item) => (
+              {NAV_ITEMS.map((item) => (
                 <a
-                  key={item}
-                  href={`#${item.toLowerCase().replace(/\s+/g, "-")}`}
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setIsOpen(false)}
                   className="text-lg font-medium text-brand-muted"
                 >
-                  {item}
+                  {item.label}
                 </a>
               ))}
 
@@ -125,9 +131,9 @@ const Navbar = () => {
       </AnimatePresence>
     </nav>
   );
-};
+}
 
-const Hero = () => {
+function Hero() {
   return (
     <section className="overflow-hidden px-6 pb-20 pt-32">
       <div className="mx-auto flex max-w-7xl flex-col items-center gap-16 lg:flex-row">
@@ -139,18 +145,18 @@ const Hero = () => {
         >
           <div className="mb-8 inline-flex items-center gap-2 rounded-full bg-brand-light/50 px-4 py-1.5 text-sm font-medium text-brand-primary">
             <CheckCircle2 className="h-4 w-4" />
-            Trusted by 10k+ healthcare providers
+            Built for medicine understanding, not diagnosis
           </div>
 
           <h1 className="mb-6 max-w-4xl text-5xl font-bold leading-[1.05] tracking-tight text-brand-ink lg:text-7xl">
-            Bridging the Language Gap in{" "}
-            <span className="text-brand-primary">Healthcare</span>
+            Understand Chinese medicine information with{" "}
+            <span className="text-brand-primary">clear English support</span>
           </h1>
 
           <p className="mx-auto mb-10 max-w-2xl text-xl leading-relaxed text-brand-muted lg:mx-0">
-            Instant AI translation and smart scanning for medicine packages and
-            medical reports. Keep your family informed and safe with
-            medically-trained intelligence.
+            Scan medicine packages, prescriptions, or reports. YAOBOX extracts
+            text, translates key information, explains it simply, saves scan
+            history, and helps create medication reminders.
           </p>
 
           <div className="flex flex-col justify-center gap-4 sm:flex-row lg:justify-start">
@@ -167,7 +173,7 @@ const Hero = () => {
               href="#how-it-works"
               className="pill-button border-2 border-brand-secondary text-center text-lg font-semibold text-brand-secondary hover:bg-brand-secondary/5"
             >
-              Watch Demo
+              See how it works
             </a>
           </div>
         </motion.div>
@@ -180,16 +186,16 @@ const Hero = () => {
         >
           <div className="relative overflow-hidden rounded-[3rem] border-8 border-white shadow-2xl transition-transform duration-500 group-hover:scale-[1.02]">
             <img
-  src="/landing-hero.jpg"
-  alt="YAOBOX medicine scanning preview"
-  className="aspect-square w-full object-cover"
-/>
+              src="/landing-hero.jpg"
+              alt="YAOBOX medicine scanning preview"
+              className="aspect-square w-full object-cover"
+            />
             <div className="absolute inset-0 bg-gradient-to-t from-brand-primary/40 via-transparent to-transparent" />
             <div className="absolute bottom-8 left-8 right-8 rounded-2xl border border-white/20 bg-white/30 p-6 backdrop-blur-xl">
               <div className="flex items-center gap-3">
                 <div className="h-2 w-2 animate-pulse rounded-full bg-green-400" />
                 <span className="text-sm font-medium text-white">
-                  AI Analysis in Progress...
+                  OCR and AI explanation require user review
                 </span>
               </div>
             </div>
@@ -201,25 +207,25 @@ const Hero = () => {
       </div>
     </section>
   );
-};
+}
 
-const Steps = () => {
+function Steps() {
   const steps = [
     {
       icon: <Camera className="h-8 w-8" />,
-      title: "1. Scan",
-      desc: "Point your camera at any medicine packaging, instruction leaflet, or medical report."
+      title: "1. Scan or upload",
+      desc: "Upload a medicine package, prescription, or report image for OCR processing.",
     },
     {
       icon: <Languages className="h-8 w-8" />,
-      title: "2. Translate",
-      desc: "Our specialized AI deciphers complex medical terminology and dosage instructions instantly."
+      title: "2. Translate and explain",
+      desc: "The system extracts text and provides a simple English explanation while keeping OCR uncertainty visible.",
     },
     {
-      icon: <CheckCircle2 className="h-8 w-8" />,
-      title: "3. Manage",
-      desc: "Save translations, set smart reminders, and keep a digital history for your doctor visits."
-    }
+      icon: <History className="h-8 w-8" />,
+      title: "3. Save and manage",
+      desc: "Review scan history, create reminders, and revisit saved medicine information later.",
+    },
   ];
 
   return (
@@ -227,17 +233,17 @@ const Steps = () => {
       <div className="mx-auto max-w-7xl px-6">
         <div className="mb-20 text-center">
           <h2 className="mb-4 text-4xl font-bold text-brand-ink">
-            Three Steps to Clarity
+            Three steps to safer understanding
           </h2>
           <p className="mx-auto max-w-2xl text-lg text-brand-muted">
-            Simple, fast, and medically precise translation at your fingertips.
+            YAOBOX keeps the flow simple while avoiding fake medical certainty.
           </p>
         </div>
 
         <div className="grid grid-cols-1 gap-12 md:grid-cols-3">
-          {steps.map((step, idx) => (
+          {steps.map((step) => (
             <motion.div
-              key={idx}
+              key={step.title}
               whileHover={{ y: -10 }}
               className="group relative"
             >
@@ -256,126 +262,128 @@ const Steps = () => {
       </div>
     </section>
   );
-};
+}
 
-const Features = () => {
+function Features() {
+  const featureCards = [
+    {
+      icon: <Brain className="h-7 w-7" />,
+      title: "Trust-aware AI explanation",
+      desc: "AI helps explain extracted medicine information, but the app does not claim diagnosis, treatment decisions, or guaranteed accuracy.",
+    },
+    {
+      icon: <Bell className="h-7 w-7" />,
+      title: "Medication reminders",
+      desc: "Create reminders from scan results or manually. Browser notifications can alert users while the app is open and permission is enabled.",
+    },
+    {
+      icon: <History className="h-7 w-7" />,
+      title: "Scan history",
+      desc: "Saved scans keep medicine name, source type, OCR text, AI explanation, warnings, confidence, and trust notes visible.",
+    },
+    {
+      icon: <FileText className="h-7 w-7" />,
+      title: "Prescription and report OCR",
+      desc: "Prescription/report uploads are processed as OCR records, with extracted text and explanation available for review.",
+    },
+  ];
+
   return (
     <section id="features" className="px-6 py-24">
       <div className="mx-auto max-w-7xl">
         <div className="mb-16 flex flex-col items-end justify-between gap-6 md:flex-row">
           <div className="max-w-2xl">
             <h2 className="mb-4 text-4xl font-bold tracking-tight text-brand-ink">
-              Designed for Your Wellbeing
+              Features that match the actual system
             </h2>
             <p className="text-lg text-brand-muted">
-              Beyond translation, Yaobox is your intelligent pharmaceutical
-              companion.
+              No fake healthcare-provider claims. No fake perfect translation.
+              No fake clinical guarantees.
             </p>
           </div>
 
-          <button className="group flex items-center gap-2 font-semibold text-brand-primary">
-            View All Features
+          <Link
+            to="/register"
+            className="group flex items-center gap-2 font-semibold text-brand-primary"
+          >
+            Try the app
             <ChevronRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
-          </button>
+          </Link>
         </div>
 
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-12">
-          <div className="group overflow-hidden rounded-[2rem] border border-brand-primary/5 bg-white p-12 md:col-span-8">
-            <div className="flex flex-col items-center gap-12 lg:flex-row">
-              <div className="z-10 flex-1">
-                <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-xl bg-brand-light/40 text-brand-primary">
-                  <Brain className="h-6 w-6" />
-                </div>
-                <h3 className="mb-6 text-3xl font-bold text-brand-ink">
-                  AI Precision Medical Engine
-                </h3>
-                <p className="text-lg leading-relaxed text-brand-muted">
-                  Unlike generic translators, our AI is trained specifically on
-                  medical databases and pharmaceutical glossaries, ensuring zero
-                  misinterpretation of ingredients or dosages.
-                </p>
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+          {featureCards.map((feature) => (
+            <motion.div
+              key={feature.title}
+              whileHover={{ y: -4 }}
+              className="rounded-[2rem] border border-brand-primary/5 bg-white p-10 shadow-sm"
+            >
+              <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-xl bg-brand-light/40 text-brand-primary">
+                {feature.icon}
               </div>
-
-              <div className="relative aspect-square w-full overflow-hidden rounded-2xl shadow-xl lg:w-72">
-                <img
-                  src="https://images.unsplash.com/photo-1559757175-5700dde675bc?auto=format&fit=crop&q=80&w=1000"
-                  alt="Neural Network"
-                  className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
-                  referrerPolicy="no-referrer"
-                />
-                <div className="absolute inset-0 bg-brand-primary/10 mix-blend-multiply" />
-              </div>
-            </div>
-          </div>
-
-          <div className="relative overflow-hidden rounded-[2rem] bg-brand-light/30 p-10 md:col-span-4">
-            <div>
-              <Bell className="mb-6 h-10 w-10 text-brand-primary" />
               <h3 className="mb-4 text-2xl font-bold text-brand-ink">
-                Smart Reminders
+                {feature.title}
               </h3>
-              <p className="leading-relaxed text-brand-muted">
-                Automatic schedule generation based on scanned dosages. Never
-                miss a vital dose again.
+              <p className="text-lg leading-relaxed text-brand-muted">
+                {feature.desc}
+              </p>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Safety() {
+  return (
+    <section id="safety" className="bg-white px-6 py-24">
+      <div className="mx-auto max-w-7xl">
+        <div className="rounded-[3rem] border border-brand-primary/10 bg-brand-light/20 p-10 lg:p-16">
+          <div className="flex flex-col gap-10 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-3xl">
+              <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-bold text-brand-primary">
+                <ShieldCheck className="h-4 w-4" />
+                Safety boundary
+              </div>
+
+              <h2 className="mb-6 text-4xl font-bold text-brand-ink">
+                YAOBOX explains medicine information. It does not replace a
+                professional.
+              </h2>
+
+              <p className="text-lg leading-relaxed text-brand-muted">
+                OCR can be incomplete. AI can be wrong. Verified catalog data,
+                extracted OCR text, and AI explanation must stay visibly separate
+                so users know what they are looking at.
               </p>
             </div>
 
-            <div className="mt-8 translate-y-2 rounded-2xl border border-brand-primary/5 border-white/50 bg-white/60 p-6 shadow-sm backdrop-blur-md">
-              <div className="mb-3 flex items-center gap-3">
-                <div className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" />
-                <span className="text-sm font-bold uppercase tracking-wider text-brand-ink">
-                  Upcoming: 09:00 AM
-                </span>
-              </div>
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-primary/60">
-                Panax Ginseng - 2 Capsules
+            <div className="rounded-[2rem] bg-white p-6 shadow-sm lg:w-[340px]">
+              <p className="mb-4 text-sm font-bold uppercase tracking-[0.18em] text-brand-primary">
+                Use YAOBOX for
               </p>
-            </div>
-          </div>
-
-          <div className="flex min-h-[300px] flex-col justify-end rounded-[2rem] bg-brand-secondary p-10 text-white md:col-span-4">
-            <History className="mb-8 h-12 w-12 opacity-80" />
-            <h3 className="mb-4 text-2xl font-bold">Medical History</h3>
-            <p className="leading-relaxed text-brand-surface/80">
-              Keep a complete digital archive of all scanned medications and
-              reports to share with your healthcare provider securely.
-            </p>
-          </div>
-
-          <div className="group overflow-hidden rounded-[2rem] border border-brand-primary/5 bg-white p-12 md:col-span-8">
-            <div className="flex flex-col items-center gap-12 lg:flex-row-reverse">
-              <div className="flex-1 text-center lg:text-right">
-                <ShieldCheck className="mb-6 h-12 w-12 text-brand-primary lg:ml-auto" />
-                <h3 className="mb-6 text-3xl font-bold text-brand-ink">
-                  Privacy First
-                </h3>
-                <p className="text-lg leading-relaxed text-brand-muted">
-                  Your medical data is encrypted and stored locally. We respect
-                  your confidentiality and never share your data with third
-                  parties.
-                </p>
-              </div>
-
-              <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-brand-primary/5 bg-brand-surface lg:w-72">
-                <img
-                  src="https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&fit=crop&q=80&w=1000"
-                  alt="Security Shield"
-                  className="h-full w-full object-cover opacity-50 transition-transform duration-700 group-hover:scale-105"
-                  referrerPolicy="no-referrer"
-                />
-                <ShieldCheck className="absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 text-brand-primary" />
-              </div>
+              <ul className="space-y-3 text-sm font-medium text-brand-muted">
+                <li>• Understanding labels and scan text</li>
+                <li>• Saving medicine-related records</li>
+                <li>• Creating reminders</li>
+                <li>• Preparing questions for a pharmacist or doctor</li>
+              </ul>
+              <p className="mt-6 text-sm font-bold text-brand-ink">
+                Do not use it for emergency decisions, diagnosis, or changing
+                prescribed treatment.
+              </p>
             </div>
           </div>
         </div>
       </div>
     </section>
   );
-};
+}
 
-const CTA = () => {
+function CTA() {
   return (
-    <section id="pricing" className="px-6 py-24">
+    <section id="support" className="px-6 py-24">
       <div className="mx-auto max-w-7xl">
         <motion.div
           whileInView={{ scale: [0.95, 1], opacity: [0, 1] }}
@@ -383,21 +391,18 @@ const CTA = () => {
         >
           <div className="relative z-10">
             <h2 className="mx-auto mb-8 max-w-3xl text-4xl font-bold leading-tight text-white lg:text-5xl">
-              Ready to take control of your medication safety?
+              Start with one scan and review the result carefully.
             </h2>
             <p className="mx-auto mb-12 max-w-2xl text-xl text-brand-light/80">
-              Join thousands of users who trust Yaobox for accurate healthcare
-              translations every day.
+              Use YAOBOX to understand and organize medicine information. Confirm
+              important health decisions with a doctor or pharmacist.
             </p>
             <Link
               to="/register"
-              className="pill-button px-10 py-5 text-xl font-bold text-brand-primary bg-white shadow-2xl shadow-white/10 transition-transform hover:scale-105"
+              className="pill-button bg-white px-10 py-5 text-xl font-bold text-brand-primary shadow-2xl shadow-white/10 transition-transform hover:scale-105"
             >
-              Start Your First Scan Now
+              Create Account
             </Link>
-            <p className="mt-8 text-sm font-medium tracking-wide text-brand-light/50">
-              NO CREDIT CARD REQUIRED. FREE FOR UP TO 5 SCANS PER MONTH.
-            </p>
           </div>
 
           <div className="absolute right-0 top-0 h-64 w-64 translate-x-1/2 -translate-y-1/2 rounded-full bg-white/5 blur-2xl" />
@@ -406,49 +411,32 @@ const CTA = () => {
       </div>
     </section>
   );
-};
+}
 
-const Footer = () => {
+function Footer() {
   return (
     <footer className="border-t border-brand-primary/5 bg-white px-6 py-16">
       <div className="mx-auto max-w-7xl">
         <div className="mb-12 flex flex-col items-center justify-between gap-12 md:flex-row">
           <Logo
             className="origin-center scale-90 transform md:origin-left md:scale-100"
-            showTagline={true}
+            showTagline
           />
 
-          <div className="flex flex-wrap justify-center gap-8">
-            {["Privacy Policy", "Terms of Service", "Cookie Policy", "Contact Us"].map(
-              (item) => (
-                <a
-                  key={item}
-                  href="#"
-                  className="border-b border-transparent pb-1 text-xs font-bold uppercase tracking-widest text-brand-muted transition-colors hover:border-brand-primary/20 hover:text-brand-primary"
-                >
-                  {item}
-                </a>
-              )
-            )}
-          </div>
-
-          <div className="flex items-center gap-6">
-            <button className="p-2 text-brand-muted transition-colors hover:scale-110 hover:text-brand-primary active:scale-95">
-              <Globe className="h-5 w-5" />
-            </button>
-            <button className="p-2 text-brand-muted transition-colors hover:scale-110 hover:text-brand-primary active:scale-95">
-              <Share2 className="h-5 w-5" />
-            </button>
+          <div className="flex flex-wrap justify-center gap-8 text-xs font-bold uppercase tracking-widest text-brand-muted">
+            <span>OCR requires review</span>
+            <span>AI explanation is not medical advice</span>
+            <span>Confirm with professionals</span>
           </div>
         </div>
 
         <div className="border-t border-brand-primary/5 pt-12 text-center text-[10px] font-medium uppercase tracking-[0.5em] text-brand-muted/40">
-          Designed for absolute clarity and human wellness.
+          Designed for medicine understanding and safer information review.
         </div>
       </div>
     </footer>
   );
-};
+}
 
 export default function LandingPage() {
   return (
@@ -457,6 +445,7 @@ export default function LandingPage() {
       <Hero />
       <Steps />
       <Features />
+      <Safety />
       <CTA />
       <Footer />
     </div>
