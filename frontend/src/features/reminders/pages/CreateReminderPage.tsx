@@ -40,12 +40,22 @@ function firstNonEmptyString(...values: unknown[]): string {
   return "";
 }
 
+function toReminderIsoDateTime(value: string): string {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toISOString();
+}
+
 function buildCreatePayload(
   form: ReminderFormState,
   state: ReminderPrefillState
 ): ReminderCreatePayload {
   const payload: ReminderCreatePayload = {
-    reminder_time: form.reminderTime,
+    reminder_time: toReminderIsoDateTime(form.reminderTime),
     frequency: form.frequency,
     dosage_note: form.dosageNote.trim() || null,
     is_active: form.isActive,
@@ -345,7 +355,9 @@ export default function CreateReminderPage() {
                 disabled={createReminderMutation.isPending}
                 className="rounded-full bg-brand-secondary px-6 py-3.5 text-white font-bold shadow-lg shadow-brand-secondary/20 transition-all hover:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {createReminderMutation.isPending ? "Creating..." : "Create reminder"}
+                {createReminderMutation.isPending
+                  ? "Creating..."
+                  : "Create reminder"}
               </button>
 
               <button

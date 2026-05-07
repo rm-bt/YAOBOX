@@ -52,6 +52,16 @@ function firstNonEmptyString(...values: unknown[]): string {
   return "";
 }
 
+function toReminderIsoDateTime(value: string): string {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toISOString();
+}
+
 function formatTimeLabel(value: unknown): string {
   if (typeof value !== "string" || !value) return "Time not set";
 
@@ -105,9 +115,9 @@ function normalizeReminder(raw: ReminderItem): NormalizedReminder {
 
 function buildCreatePayload(form: ReminderFormState): ReminderCreatePayload {
   const payload: ReminderCreatePayload = {
-    reminder_time: form.reminderTime,
+    reminder_time: toReminderIsoDateTime(form.reminderTime),
     frequency: form.frequency,
-    dosage_note: form.dosageNote,
+    dosage_note: form.dosageNote.trim() || null,
     is_active: form.isActive,
   };
 
@@ -140,11 +150,15 @@ const StatCard = ({
     whileHover={{ y: -2 }}
     className="bg-white p-6 rounded-[28px] border border-slate-100 shadow-sm flex items-center gap-5"
   >
-    <div className={`w-14 h-14 ${colorClass} rounded-full flex items-center justify-center`}>
+    <div
+      className={`w-14 h-14 ${colorClass} rounded-full flex items-center justify-center`}
+    >
       {icon}
     </div>
     <div>
-      <div className="text-3xl font-bold text-slate-900 leading-none">{value}</div>
+      <div className="text-3xl font-bold text-slate-900 leading-none">
+        {value}
+      </div>
       <div className="text-slate-500 font-medium mt-2">{label}</div>
     </div>
   </motion.div>
@@ -249,7 +263,9 @@ export default function RemindersPage() {
     () => activeReminders.filter((item) => isDueToday(item.reminderTimeRaw)),
     [activeReminders]
   );
-const reminderNotifications = useReminderNotifications(activeReminders);
+
+  const reminderNotifications = useReminderNotifications(activeReminders);
+
   const isAnyMutationPending =
     createReminderMutation.isPending ||
     updateReminderMutation.isPending ||
@@ -326,38 +342,41 @@ const reminderNotifications = useReminderNotifications(activeReminders);
           <ShieldCheck size={16} />
           Reminders support medication management. They do not replace medical advice.
         </div>
+
         <div className="rounded-[24px] border border-slate-100 bg-white px-5 py-4 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-  <div>
-    <p className="text-sm font-bold text-slate-900">Browser reminder notifications</p>
-    <p className="text-sm text-slate-500 mt-1 leading-relaxed">
-      {reminderNotifications.supported
-        ? reminderNotifications.enabled
-          ? `Notifications are enabled. Watching ${reminderNotifications.activeReminderCount} active reminder(s).`
-          : reminderNotifications.permission === "denied"
-            ? "Notifications are blocked in this browser. Enable them from browser site settings."
-            : "Enable notifications so YAOBOX can alert you while the app is open."
-        : "This browser does not support notification alerts."}
-    </p>
+          <div>
+            <p className="text-sm font-bold text-slate-900">
+              Browser reminder notifications
+            </p>
+            <p className="text-sm text-slate-500 mt-1 leading-relaxed">
+              {reminderNotifications.supported
+                ? reminderNotifications.enabled
+                  ? `Notifications are enabled. Watching ${reminderNotifications.activeReminderCount} active reminder(s).`
+                  : reminderNotifications.permission === "denied"
+                    ? "Notifications are blocked in this browser. Enable them from browser site settings."
+                    : "Enable notifications so YAOBOX can alert you while the app is open."
+                : "This browser does not support notification alerts."}
+            </p>
 
-    {reminderNotifications.lastNotificationLabel ? (
-      <p className="text-xs text-brand-primary font-semibold mt-2">
-        Last notification: {reminderNotifications.lastNotificationLabel}
-      </p>
-    ) : null}
-  </div>
+            {reminderNotifications.lastNotificationLabel ? (
+              <p className="text-xs text-brand-primary font-semibold mt-2">
+                Last notification: {reminderNotifications.lastNotificationLabel}
+              </p>
+            ) : null}
+          </div>
 
-  {reminderNotifications.supported && !reminderNotifications.enabled ? (
-    <button
-      type="button"
-      onClick={() => {
-        void reminderNotifications.requestPermission();
-      }}
-      className="rounded-full bg-brand-secondary px-5 py-3 text-sm font-bold text-white shadow-lg shadow-brand-secondary/20 hover:brightness-95 transition-all"
-    >
-      Enable notifications
-    </button>
-  ) : null}
-</div>
+          {reminderNotifications.supported && !reminderNotifications.enabled ? (
+            <button
+              type="button"
+              onClick={() => {
+                void reminderNotifications.requestPermission();
+              }}
+              className="rounded-full bg-brand-secondary px-5 py-3 text-sm font-bold text-white shadow-lg shadow-brand-secondary/20 hover:brightness-95 transition-all"
+            >
+              Enable notifications
+            </button>
+          ) : null}
+        </div>
       </header>
 
       <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -394,7 +413,9 @@ const reminderNotifications = useReminderNotifications(activeReminders);
               <Plus size={22} />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-900">Create reminder</h2>
+              <h2 className="text-xl font-bold text-slate-900">
+                Create reminder
+              </h2>
               <p className="text-sm text-slate-500">
                 Saved through the shared backend reminder API.
               </p>
@@ -682,7 +703,9 @@ const reminderNotifications = useReminderNotifications(activeReminders);
                     >
                       <div className="flex items-center justify-between gap-4">
                         <div>
-                          <p className="font-bold text-slate-900">{item.title}</p>
+                          <p className="font-bold text-slate-900">
+                            {item.title}
+                          </p>
                           <p className="text-sm text-slate-600 mt-1">
                             {item.dosageNote}
                           </p>
