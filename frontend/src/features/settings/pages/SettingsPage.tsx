@@ -4,9 +4,11 @@ import {
   BellRing,
   ChevronRight,
   Globe2,
+  Moon,
   Palette,
   ShieldCheck,
   Smartphone,
+  Sun,
   UserRound,
 } from "lucide-react";
 
@@ -21,9 +23,7 @@ export default function SettingsPage() {
 
   const isDark = theme === "dark";
 
-  const pageClass = isDark
-    ? "text-white"
-    : "text-slate-900";
+  const pageClass = isDark ? "text-white" : "text-slate-900";
 
   const cardClass = isDark
     ? "rounded-[32px] border border-slate-800 bg-slate-950 p-6 shadow-sm"
@@ -31,6 +31,7 @@ export default function SettingsPage() {
 
   const mutedText = isDark ? "text-slate-300" : "text-slate-600";
   const subtleText = isDark ? "text-slate-400" : "text-slate-500";
+
   const softPanel = isDark
     ? "border-slate-800 bg-slate-900"
     : "border-slate-100 bg-slate-50";
@@ -47,8 +48,8 @@ export default function SettingsPage() {
         </h1>
 
         <p className={`text-lg max-w-3xl leading-relaxed ${mutedText}`}>
-          Control appearance, avatar, notification behavior, and account shortcuts
-          from one clear place.
+          Control appearance, avatar, notification behavior, and account
+          shortcuts from one clear place.
         </p>
 
         <div
@@ -60,7 +61,8 @@ export default function SettingsPage() {
           ].join(" ")}
         >
           <ShieldCheck size={16} />
-          Settings stay local for this MVP unless backend persistence is added later.
+          Settings stay local for this MVP unless backend persistence is added
+          later.
         </div>
       </header>
 
@@ -74,12 +76,16 @@ export default function SettingsPage() {
             <div className="flex items-center gap-4">
               <div
                 className={`h-20 w-20 rounded-full ${avatar.bgClass} flex items-center justify-center text-4xl border-4 border-white shadow-md`}
+                title={`Current avatar: ${avatar.label}`}
               >
                 <span aria-hidden="true">{avatar.emoji}</span>
+                <span className="sr-only">Current avatar: {avatar.label}</span>
               </div>
 
               <div>
-                <p className={`text-sm font-bold uppercase tracking-[0.12em] ${subtleText}`}>
+                <p
+                  className={`text-sm font-bold uppercase tracking-[0.12em] ${subtleText}`}
+                >
                   Current avatar
                 </p>
                 <h2 className="text-2xl font-bold mt-1">{avatar.label}</h2>
@@ -103,13 +109,20 @@ export default function SettingsPage() {
                           ? "border-slate-800 bg-slate-900 hover:bg-slate-800"
                           : "border-slate-200 bg-slate-50 hover:bg-white",
                     ].join(" ")}
+                    title={option.label}
+                    aria-pressed={selected}
                   >
                     <span
                       className={`h-12 w-12 rounded-full ${option.bgClass} flex items-center justify-center text-2xl`}
+                      aria-hidden="true"
                     >
                       {option.emoji}
                     </span>
-                    <span className={`text-xs font-semibold text-center ${isDark ? "text-slate-200" : "text-slate-700"}`}>
+                    <span
+                      className={`text-xs font-semibold text-center ${
+                        isDark ? "text-slate-200" : "text-slate-700"
+                      }`}
+                    >
                       {option.label}
                     </span>
                   </button>
@@ -123,7 +136,9 @@ export default function SettingsPage() {
               <div
                 className={[
                   "h-12 w-12 rounded-full flex items-center justify-center",
-                  isDark ? "bg-slate-800 text-slate-100" : "bg-slate-100 text-slate-700",
+                  isDark
+                    ? "bg-slate-800 text-slate-100"
+                    : "bg-slate-100 text-slate-700",
                 ].join(" ")}
               >
                 <Smartphone size={22} />
@@ -135,6 +150,11 @@ export default function SettingsPage() {
                 </p>
               </div>
             </div>
+
+            <p className={`text-sm leading-relaxed mb-5 ${mutedText}`}>
+              Browser notifications depend on browser permission and only work
+              while the app is open in this MVP.
+            </p>
 
             <Link
               to="/reminders"
@@ -188,8 +208,20 @@ export default function SettingsPage() {
                       ? "border-slate-800 bg-slate-900 hover:bg-slate-800"
                       : "border-slate-200 bg-slate-50 hover:bg-white",
                 ].join(" ")}
+                aria-pressed={theme === "light"}
               >
-                <p className="text-2xl mb-4">☀️</p>
+                <div
+                  className={[
+                    "mb-4 flex h-11 w-11 items-center justify-center rounded-full",
+                    theme === "light"
+                      ? "bg-brand-primary-container text-brand-on-primary-container"
+                      : isDark
+                        ? "bg-slate-800 text-slate-200"
+                        : "bg-white text-slate-700",
+                  ].join(" ")}
+                >
+                  <Sun size={22} />
+                </div>
                 <p className="font-bold">Light mode</p>
                 <p className={`text-sm mt-2 ${mutedText}`}>
                   Clean bright interface for regular use.
@@ -207,8 +239,20 @@ export default function SettingsPage() {
                       ? "border-slate-800 bg-slate-900 hover:bg-slate-800"
                       : "border-slate-200 bg-slate-50 hover:bg-white",
                 ].join(" ")}
+                aria-pressed={theme === "dark"}
               >
-                <p className="text-2xl mb-4">🌙</p>
+                <div
+                  className={[
+                    "mb-4 flex h-11 w-11 items-center justify-center rounded-full",
+                    theme === "dark"
+                      ? "bg-slate-700 text-white"
+                      : isDark
+                        ? "bg-slate-800 text-slate-200"
+                        : "bg-white text-slate-700",
+                  ].join(" ")}
+                >
+                  <Moon size={22} />
+                </div>
                 <p className="font-bold">Dark mode</p>
                 <p className={`text-sm mt-2 ${mutedText}`}>
                   Lower-glare interface for night work.
@@ -216,8 +260,11 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            <div className={`mt-5 rounded-[20px] border px-4 py-4 text-sm ${softPanel} ${mutedText}`}>
-              Current mode: <strong>{theme === "dark" ? "Dark" : "Light"}</strong>
+            <div
+              className={`mt-5 rounded-[20px] border px-4 py-4 text-sm ${softPanel} ${mutedText}`}
+            >
+              Current mode:{" "}
+              <strong>{theme === "dark" ? "Dark" : "Light"}</strong>
             </div>
           </motion.div>
 
@@ -262,7 +309,9 @@ export default function SettingsPage() {
                       <div
                         className={[
                           "h-10 w-10 rounded-full flex items-center justify-center",
-                          isDark ? "bg-slate-950 text-slate-100" : "bg-white text-slate-700",
+                          isDark
+                            ? "bg-slate-950 text-slate-100"
+                            : "bg-white text-slate-700",
                         ].join(" ")}
                       >
                         <Icon size={18} />
