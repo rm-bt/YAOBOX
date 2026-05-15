@@ -1,6 +1,7 @@
 import logging
 import time
 
+from deep_translator import GoogleTranslator
 from google import genai
 
 from app.core.config import settings
@@ -10,9 +11,9 @@ logger = logging.getLogger(__name__)
 MAX_AI_OUTPUT_CHARS = 1800
 
 GENERAL_SAFETY_NOTE = (
-    "This is an AI-generated explanation based on available scan/catalog text. "
-    "It may be incomplete or wrong. Confirm important medicine decisions with a "
-    "doctor or pharmacist."
+    "This is an AI-generated or machine-translated explanation based on OCR/catalog text. "
+    "OCR and translation may be incomplete or wrong. Confirm important medicine decisions "
+    "with a doctor or pharmacist."
 )
 
 
@@ -32,6 +33,39 @@ def _shorten_output(value: str) -> str:
     return cleaned[:MAX_AI_OUTPUT_CHARS].rstrip() + "\n\n[Output shortened.]"
 
 
+def _translate_text_fallback(text: str | None) -> str:
+    if not text or not text.strip():
+        return ""
+
+    try:
+        translated = GoogleTranslator(source="auto", target="en").translate(text.strip())
+        return translated.strip() if translated else ""
+    except Exception as exc:
+        logger.warning("Fallback translation failed: %s", exc)
+        return ""
+
+
+def _build_translation_fallback(raw_text: str | None) -> str:
+    translated = _translate_text_fallback(raw_text)
+
+    if translated:
+        return _shorten_output(
+            "English Translation:\n"
+            f"{translated}\n\n"
+            "Simple Explanation:\n"
+            "The text above is a direct machine translation of the OCR-extracted Chinese document text. "
+            "Use it to understand the visible content, but verify important medicine details with a professional.\n\n"
+            f"Safety Note: {GENERAL_SAFETY_NOTE}"
+        )
+
+    return (
+        "English Translation: Not available\n"
+        "Simple Explanation: AI explanation and machine translation are temporarily unavailable. "
+        "Review the original OCR text directly.\n"
+        f"Safety Note: {GENERAL_SAFETY_NOTE}"
+    )
+
+
 def explain_medicine_info(
     medicine_name: str | None,
     manufacturer: str | None,
@@ -39,13 +73,11 @@ def explain_medicine_info(
     dosage: str | None,
     raw_text: str | None = None,
 ) -> str:
-    client = _get_client()
-
     prompt = f"""
 You are a medical translation and medicine-label explanation assistant for foreign users in China.
 
 Task:
-Translate and explain the provided medicine information in clear English.
+Translate and explain the provided medicine/document information in clear English.
 
 Hard safety rules:
 - Do not diagnose disease.
@@ -56,9 +88,11 @@ Hard safety rules:
 - If information is missing, write "Not available".
 - Treat OCR text as possibly incomplete or inaccurate.
 - Keep warnings and uncertainty visible.
+- If the input is a prescription or medical report, translate/explain the visible text only.
 
 Return plain text only using this structure:
 
+English Translation:
 Medicine:
 Manufacturer:
 Usage:
@@ -74,6 +108,12 @@ Usage: {usage or ""}
 Dosage: {dosage or ""}
 Raw OCR text: {raw_text or ""}
 """.strip()
+
+    try:
+        client = _get_client()
+    except Exception as exc:
+        logger.warning("Gemini client unavailable, using translation fallback: %s", exc)
+        return _build_translation_fallback(raw_text)
 
     for attempt in range(3):
         try:
@@ -94,21 +134,7 @@ Raw OCR text: {raw_text or ""}
             )
             time.sleep(1)
 
-    safe_name = medicine_name or "Unknown medicine"
-    safe_manufacturer = manufacturer or "Not available"
-    safe_usage = usage or "Not available"
-    safe_dosage = dosage or "Not available"
-
-    return (
-        f"Medicine: {safe_name}\n"
-        f"Manufacturer: {safe_manufacturer}\n"
-        f"Usage: {safe_usage}\n"
-        f"Dosage: {safe_dosage}\n"
-        "Warnings: Not available\n"
-        "Simple Explanation: AI explanation is temporarily unavailable. "
-        "The fields above are only the available recorded scan/catalog values.\n"
-        f"Safety Note: {GENERAL_SAFETY_NOTE}"
-    )
+    return _build_translation_fallback(raw_text)
 
 
 def answer_scan_question(
@@ -119,8 +145,6 @@ def answer_scan_question(
     translated_text: str | None,
     user_question: str,
 ) -> str:
-    client = _get_client()
-
     prompt = f"""
 You are a medicine-information assistant for foreign users in China.
 
@@ -151,6 +175,15 @@ User question:
 Return a clear answer under 200 words, followed by a short safety note.
 """.strip()
 
+    try:
+        client = _get_client()
+    except Exception as exc:
+        logger.warning("Gemini client unavailable for scan question: %s", exc)
+        return (
+            "Answer: AI question answering is temporarily unavailable.\n"
+            f"Safety Note: {GENERAL_SAFETY_NOTE}"
+        )
+
     for attempt in range(3):
         try:
             response = client.models.generate_content(
@@ -170,15 +203,7 @@ Return a clear answer under 200 words, followed by a short safety note.
             )
             time.sleep(1)
 
-    safe_name = medicine_name or "Unknown medicine"
-    safe_usage = usage or "Not available"
-    safe_dosage = dosage or "Not available"
-
     return (
-        f"Medicine: {safe_name}\n"
-        f"Usage: {safe_usage}\n"
-        f"Dosage: {safe_dosage}\n"
-        "Answer: AI question answering is temporarily unavailable. I cannot safely "
-        "infer more than the recorded scan/catalog fields above.\n"
+        "Answer: AI question answering is temporarily unavailable.\n"
         f"Safety Note: {GENERAL_SAFETY_NOTE}"
     )

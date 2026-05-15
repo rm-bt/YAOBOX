@@ -8,6 +8,8 @@ class MedicineCreate(BaseModel):
     barcode: str | None = None
     manufacturer: str | None = None
     manufacturer_en: str | None = None
+    ingredients: str | None = None
+    ingredients_en: str | None = None
     usage: str | None = None
     usage_en: str | None = None
     dosage: str | None = None
@@ -24,6 +26,8 @@ class MedicineResponse(BaseModel):
     barcode: str | None = None
     manufacturer: str | None = None
     manufacturer_en: str | None = None
+    ingredients: str | None = None
+    ingredients_en: str | None = None
     usage: str | None = None
     usage_en: str | None = None
     dosage: str | None = None

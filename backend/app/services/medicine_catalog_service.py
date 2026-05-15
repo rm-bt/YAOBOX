@@ -1,6 +1,8 @@
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -8,6 +10,23 @@ from app.models.medicine import Medicine
 
 
 SEED_PATH = Path(__file__).resolve().parents[1] / "data" / "verified_medicines_seed.json"
+
+MIN_MATCH_SCORE = 55
+
+CHINESE_PHRASE_MIN_LENGTH = 2
+
+MOJIBAKE_REPLACEMENTS = {
+    "ã€€": "",
+    "ã€‚": "。",
+    "ï¼Œ": "，",
+    "ï¼›": "；",
+    "ï¼š": "：",
+    "ï¼ˆ": "（",
+    "ï¼‰": "）",
+    "ï¼": "",
+}
+
+PUNCTUATION_PATTERN = re.compile(r"[\s\-_.,，。;；:：()（）【】\[\]{}<>《》/\\|]+")
 
 
 @dataclass
@@ -17,48 +36,73 @@ class CatalogMatchResult:
     reason: str
 
 
-def normalize_text(value: str | None) -> str | None:
+def normalize_text(value: Any) -> str | None:
     if value is None:
         return None
+
+    if isinstance(value, list):
+        value = ";".join(str(item).strip() for item in value if str(item).strip())
 
     cleaned = str(value).strip()
     return cleaned or None
 
 
-def normalize_key(value: str | None) -> str:
-    if not value:
+def normalize_key(value: Any) -> str:
+    if value is None:
         return ""
 
-    return (
-        str(value)
-        .replace(" ", "")
-        .replace("　", "")
-        .replace("-", "")
-        .replace("_", "")
-        .replace("（", "(")
-        .replace("）", ")")
-        .replace("：", ":")
-        .replace("，", ",")
-        .replace("。", ".")
-        .strip()
-        .lower()
-    )
+    text = str(value)
+
+    for bad, good in MOJIBAKE_REPLACEMENTS.items():
+        text = text.replace(bad, good)
+
+    text = PUNCTUATION_PATTERN.sub("", text)
+    return text.strip().lower()
 
 
-def split_aliases(value: str | None) -> list[str]:
-    if not value:
+def split_aliases(value: Any) -> list[str]:
+    if value is None:
         return []
 
-    separators = [";", "；", ",", "，", "|", "/", "\n"]
-    items = [value]
+    if isinstance(value, list):
+        raw_items = value
+    else:
+        text = str(value)
+        for bad, good in MOJIBAKE_REPLACEMENTS.items():
+            text = text.replace(bad, good)
 
-    for separator in separators:
-        next_items: list[str] = []
-        for item in items:
-            next_items.extend(item.split(separator))
-        items = next_items
+        raw_items = re.split(r"[;,；，|/\n]+", text)
 
-    return [item.strip() for item in items if item.strip()]
+    aliases: list[str] = []
+
+    for item in raw_items:
+        cleaned = str(item).strip()
+        if cleaned:
+            aliases.append(cleaned)
+
+    return list(dict.fromkeys(aliases))
+
+
+def build_alias_text(item: dict) -> str | None:
+    aliases: list[str] = []
+
+    aliases.extend(split_aliases(item.get("aliases")))
+    aliases.extend(split_aliases(item.get("search_aliases")))
+
+    for key in [
+        "canonical_name_zh",
+        "canonical_name_en",
+        "manufacturer",
+        "manufacturer_en",
+        "usage",
+        "usage_en",
+    ]:
+        value = normalize_text(item.get(key))
+        if value:
+            aliases.append(value)
+
+    aliases = list(dict.fromkeys(alias for alias in aliases if alias.strip()))
+    return ";".join(aliases) if aliases else None
 
 
 def extract_digits(value: str | None) -> str:
@@ -66,6 +110,25 @@ def extract_digits(value: str | None) -> str:
         return ""
 
     return "".join(ch for ch in str(value) if ch.isdigit())
+
+
+def contains_chinese(value: str) -> bool:
+    return bool(re.search(r"[\u3400-\u9fff]", value))
+
+
+def useful_alias(alias: str) -> bool:
+    key = normalize_key(alias)
+
+    if not key:
+        return False
+
+    if key.isdigit():
+        return len(key) >= 3
+
+    if contains_chinese(key):
+        return len(key) >= CHINESE_PHRASE_MIN_LENGTH
+
+    return len(key) >= 4
 
 
 def dosage_matches(extracted_dosage: str | None, catalog_dosage: str | None) -> bool:
@@ -105,33 +168,52 @@ def medicine_match_keys(medicine: Medicine) -> list[str]:
 
     keys.extend(split_aliases(medicine.aliases))
 
-    return [key for key in keys if key]
+    return list(dict.fromkeys(key for key in keys if key and useful_alias(key)))
 
 
-def build_query_candidates(
+def build_query_text(
     extracted_name: str | None,
     raw_text: str | None,
-) -> list[str]:
-    candidates: list[str] = []
+    extracted_manufacturer: str | None = None,
+    extracted_dosage: str | None = None,
+) -> str:
+    parts = [
+        extracted_name or "",
+        extracted_manufacturer or "",
+        extracted_dosage or "",
+        raw_text or "",
+    ]
 
-    if extracted_name:
-        candidates.append(extracted_name)
+    return "\n".join(part for part in parts if part.strip())
 
-    if raw_text:
-        lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
-        candidates.extend(lines[:12])
-        candidates.append(raw_text[:1000])
 
-    seen: set[str] = set()
-    unique_candidates: list[str] = []
+def score_alias_against_text(alias: str, query_text: str) -> int:
+    alias_key = normalize_key(alias)
+    query_key = normalize_key(query_text)
 
-    for candidate in candidates:
-        normalized = normalize_key(candidate)
-        if normalized and normalized not in seen:
-            seen.add(normalized)
-            unique_candidates.append(candidate)
+    if not alias_key or not query_key:
+        return 0
 
-    return unique_candidates
+    if alias_key == query_key:
+        return 100
+
+    if alias_key in query_key:
+        if alias_key.isdigit():
+            return 25
+
+        if contains_chinese(alias_key):
+            if len(alias_key) >= 5:
+                return 95
+            if len(alias_key) >= 3:
+                return 85
+            return 60
+
+        return 70
+
+    if query_key in alias_key and len(query_key) >= 4:
+        return 55
+
+    return 0
 
 
 def score_medicine(
@@ -145,53 +227,59 @@ def score_medicine(
     clean_barcode = normalize_text(barcode)
 
     if clean_barcode and medicine.barcode and clean_barcode == medicine.barcode:
-        return CatalogMatchResult(medicine=medicine, score=120, reason="barcode_exact")
+        return CatalogMatchResult(medicine=medicine, score=140, reason="barcode_exact")
 
-    candidates = build_query_candidates(extracted_name, raw_text)
+    query_text = build_query_text(
+        extracted_name=extracted_name,
+        raw_text=raw_text,
+        extracted_manufacturer=extracted_manufacturer,
+        extracted_dosage=extracted_dosage,
+    )
+
+    if not normalize_key(query_text):
+        return CatalogMatchResult(medicine=None, score=0, reason="empty_query")
+
     keys = medicine_match_keys(medicine)
 
     best_score = 0
-    best_reason = ""
+    matched_keys: list[str] = []
 
-    for candidate in candidates:
-        candidate_key = normalize_key(candidate)
+    for key in keys:
+        alias_score = score_alias_against_text(key, query_text)
 
-        if not candidate_key:
-            continue
+        if alias_score > 0:
+            matched_keys.append(key)
+            best_score = max(best_score, alias_score)
 
-        for key in keys:
-            catalog_key = normalize_key(key)
+    if not matched_keys:
+        return CatalogMatchResult(medicine=None, score=0, reason="no_catalog_clue")
 
-            if not catalog_key:
-                continue
-
-            if candidate_key == catalog_key:
-                if 90 > best_score:
-                    best_score = 90
-                    best_reason = "name_exact"
-            elif candidate_key in catalog_key or catalog_key in candidate_key:
-                if 75 > best_score:
-                    best_score = 75
-                    best_reason = "name_partial"
-
-    if best_score == 0:
-        return CatalogMatchResult(medicine=None, score=0, reason="no_name_match")
+    # Add overlap score for multiple useful clues.
+    # Example: 999 + 头痛 + 发热 + 鼻塞 + 流涕 + 咽痛 should beat bad OCR title text.
+    clue_bonus = min(max(len(matched_keys) - 1, 0) * 7, 35)
+    best_score += clue_bonus
 
     if dosage_matches(extracted_dosage, medicine.dosage):
-        best_score += 20
-        best_reason += "_dosage_confirmed"
+        best_score += 15
+        matched_keys.append("dosage")
 
     if text_contains(extracted_manufacturer, medicine.manufacturer) or text_contains(
         extracted_manufacturer,
         medicine.manufacturer_en,
     ):
-        best_score += 8
-        best_reason += "_manufacturer_confirmed"
+        best_score += 12
+        matched_keys.append("manufacturer")
 
     if medicine.is_verified:
-        best_score += 5
+        best_score += 8
 
-    return CatalogMatchResult(medicine=medicine, score=best_score, reason=best_reason)
+    reason = "catalog_clues:" + ",".join(matched_keys[:8])
+
+    return CatalogMatchResult(
+        medicine=medicine,
+        score=best_score,
+        reason=reason,
+    )
 
 
 def match_catalog_medicine(
@@ -204,7 +292,7 @@ def match_catalog_medicine(
 ) -> CatalogMatchResult:
     medicines = (
         db.query(Medicine)
-        .order_by(Medicine.is_verified.desc(), Medicine.id.desc())
+        .order_by(Medicine.is_verified.desc(), Medicine.id.asc())
         .all()
     )
 
@@ -223,10 +311,14 @@ def match_catalog_medicine(
         if result.score > best.score:
             best = result
 
-    if best.score >= 75:
+    if best.medicine and best.score >= MIN_MATCH_SCORE:
         return best
 
-    return CatalogMatchResult(medicine=None, score=best.score, reason="below_match_threshold")
+    return CatalogMatchResult(
+        medicine=None,
+        score=best.score,
+        reason=f"below_match_threshold:{best.reason}",
+    )
 
 
 def find_existing_medicine(db: Session, item: dict) -> Medicine | None:
@@ -271,7 +363,7 @@ def apply_medicine_fields(medicine: Medicine, item: dict) -> Medicine:
     medicine.dosage = normalize_text(item.get("dosage"))
     medicine.warnings = normalize_text(item.get("warnings"))
     medicine.warnings_en = normalize_text(item.get("warnings_en"))
-    medicine.aliases = normalize_text(item.get("aliases"))
+    medicine.aliases = build_alias_text(item)
     medicine.is_verified = bool(item.get("is_verified", True))
 
     return medicine
@@ -288,11 +380,23 @@ def seed_verified_medicines(db: Session) -> dict:
 
     items = json.loads(SEED_PATH.read_text(encoding="utf-8"))
 
+    if not isinstance(items, list):
+        return {
+            "created": 0,
+            "updated": 0,
+            "skipped": 0,
+            "message": "Seed file must contain a JSON list.",
+        }
+
     created = 0
     updated = 0
     skipped = 0
 
     for item in items:
+        if not isinstance(item, dict):
+            skipped += 1
+            continue
+
         if not item.get("canonical_name_en") and not item.get("canonical_name_zh"):
             skipped += 1
             continue

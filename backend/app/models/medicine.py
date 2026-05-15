@@ -16,6 +16,9 @@ class Medicine(Base):
     manufacturer = Column(String(255), nullable=True)
     manufacturer_en = Column(String(255), nullable=True)
 
+    ingredients = Column(Text, nullable=True)
+    ingredients_en = Column(Text, nullable=True)
+
     usage = Column(Text, nullable=True)
     usage_en = Column(Text, nullable=True)
 

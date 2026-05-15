@@ -19,11 +19,11 @@ class ScanRecord(Base):
     translated_text = Column(Text, nullable=True)
 
     manufacturer = Column(String(255), nullable=True)
+    ingredients = Column(Text, nullable=True)
     usage = Column(Text, nullable=True)
     dosage = Column(String(255), nullable=True)
     warnings = Column(Text, nullable=True)
 
-    # Trust/provenance fields for thesis-safe scan results.
     source_type = Column(String(64), nullable=True)
     match_status = Column(String(64), nullable=True)
     ocr_status = Column(String(64), nullable=True)

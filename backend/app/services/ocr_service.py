@@ -1,6 +1,7 @@
 import os
 import re
 from dataclasses import dataclass
+from deep_translator import GoogleTranslator
 
 import cv2
 import pytesseract

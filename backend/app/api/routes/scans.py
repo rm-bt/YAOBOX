@@ -11,6 +11,10 @@ from app.models.scan import ScanRecord
 from app.models.user import User
 from app.schemas.scan import ScanBarcodeRequest, ScanCreate, ScanResponse
 from app.services.ai_service import answer_scan_question, explain_medicine_info
+from app.services.openai_ocr_service import (
+    extract_text_openai_vision,
+    is_openai_ocr_enabled,
+)
 from app.services.ocr_service import (
     clean_text,
     extract_barcode,
@@ -25,7 +29,10 @@ from app.services.upload_validation import (
     validate_image_upload_metadata,
     validate_upload_bytes,
 )
-from app.services.medicine_catalog_service import match_catalog_medicine
+from app.services.medicine_catalog_service import (
+    CatalogMatchResult,
+    match_catalog_medicine,
+)
 
 router = APIRouter()
 
@@ -33,6 +40,7 @@ router = APIRouter()
 def normalize_text(value: str | None) -> str | None:
     if value is None:
         return None
+
     cleaned = value.strip()
     return cleaned or None
 
@@ -40,6 +48,7 @@ def normalize_text(value: str | None) -> str | None:
 def safe_explanation(
     medicine_name: str | None,
     manufacturer: str | None,
+    ingredients: str | None,
     usage: str | None,
     dosage: str | None,
     raw_text: str | None = None,
@@ -56,10 +65,14 @@ def safe_explanation(
         return (
             f"Medicine: {medicine_name or 'Unknown medicine'}\n"
             f"Manufacturer: {manufacturer or 'Not available'}\n"
+            f"Ingredients: {ingredients or 'Not available'}\n"
             f"Usage: {usage or 'Not available'}\n"
             f"Dosage: {dosage or 'Not available'}\n"
+            "Warnings: Not available\n"
             "Simple Explanation: AI service is temporarily unavailable. "
-            "This is a limited fallback summary."
+            "This is a limited fallback summary.\n"
+            "Safety Note: This information supports medicine understanding only. "
+            "Confirm important medicine decisions with a doctor or pharmacist."
         )
 
 
@@ -77,6 +90,7 @@ def get_ai_status(value: str | None) -> str:
 def get_match_status(medicine: Medicine | None, fallback: str = "unknown") -> str:
     if not medicine:
         return fallback
+
     return "verified" if medicine.is_verified else "catalog_unverified"
 
 
@@ -86,6 +100,8 @@ def build_trust_notes(
     ocr_status: str,
     ai_status: str,
     ocr_error: str | None = None,
+    catalog_reason: str | None = None,
+    catalog_score: int | None = None,
 ) -> str:
     notes = [
         f"Source type: {source_type}.",
@@ -94,38 +110,65 @@ def build_trust_notes(
         f"AI explanation status: {ai_status}.",
     ]
 
+    if catalog_reason:
+        notes.append(f"Catalog match reason: {catalog_reason}.")
+
+    if catalog_score is not None:
+        notes.append(f"Catalog match score: {catalog_score}.")
+
     if ocr_error:
-        notes.append(f"OCR error: {ocr_error}")
+        notes.append(
+            "OCR fallback was unavailable, so the system used the best available extraction result."
+        )
 
     if match_status == "verified":
-        notes.append("Verified catalog data should be trusted more than OCR or AI-generated text.")
+        notes.append(
+            "Verified catalog data should be trusted more than OCR or AI-generated text."
+        )
     elif match_status == "catalog_unverified":
         notes.append("Catalog data was found but is not marked verified.")
     else:
-        notes.append("No verified medicine catalog match was found; review OCR and AI text carefully.")
+        notes.append(
+            "No verified medicine catalog match was found; review OCR and AI text carefully."
+        )
 
     return " ".join(notes)
+
+
+def display_medicine_name(medicine: Medicine) -> str:
+    if medicine.canonical_name_zh and medicine.canonical_name_en:
+        return f"{medicine.canonical_name_zh} / {medicine.canonical_name_en}"
+
+    return (
+        medicine.canonical_name_zh
+        or medicine.canonical_name_en
+        or "Unknown medicine"
+    )
 
 
 def build_catalog_explanation(
     medicine: Medicine,
     raw_text: str | None = None,
 ) -> str:
-    medicine_name = medicine.canonical_name_en or medicine.canonical_name_zh or "Unknown medicine"
+    name_zh = medicine.canonical_name_zh or "Not available"
+    name_en = medicine.canonical_name_en or "Not available"
     manufacturer_text = medicine.manufacturer_en or medicine.manufacturer or "Not available"
+    ingredients_text = medicine.ingredients_en or medicine.ingredients or "Not available"
     usage_text = medicine.usage_en or medicine.usage or "Not available"
     dosage_text = medicine.dosage or "Not available"
     warning_text = medicine.warnings_en or medicine.warnings or "Not available"
 
     trust_text = (
-        "Matched against a verified catalog record."
+        "Matched against a verified local Chinese medicine catalogue record."
         if medicine.is_verified
-        else "Matched against a catalog record that is not yet verified."
+        else "Matched against a catalogue record that is not yet verified."
     )
 
     lines = [
-        f"Medicine: {medicine_name}",
+        f"Chinese name: {name_zh}",
+        f"English name: {name_en}",
         f"Manufacturer: {manufacturer_text}",
+        f"Ingredients: {ingredients_text}",
         f"Usage: {usage_text}",
         f"Dosage: {dosage_text}",
         f"Warnings: {warning_text}",
@@ -133,7 +176,12 @@ def build_catalog_explanation(
     ]
 
     if raw_text:
-        lines.append("Source note: OCR text was also captured separately for reference.")
+        lines.append("Source note: OCR text was captured separately and may contain errors.")
+
+    lines.append(
+        "Safety Note: This information supports medicine understanding only. "
+        "Confirm important medicine decisions with a doctor or pharmacist."
+    )
 
     return "\n".join(lines)
 
@@ -145,7 +193,17 @@ def extract_warning_text(raw_text: str | None, catalog_warning: str | None = Non
     if not raw_text:
         return None
 
-    keywords = ["禁忌", "注意", "慎用", "不良反应", "warning", "avoid", "caution"]
+    keywords = [
+        "禁忌",
+        "注意",
+        "慎用",
+        "不良反应",
+        "警告",
+        "warning",
+        "avoid",
+        "caution",
+    ]
+
     lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
 
     for line in lines:
@@ -156,22 +214,6 @@ def extract_warning_text(raw_text: str | None, catalog_warning: str | None = Non
     return None
 
 
-def normalize_lookup_key(value: str | None) -> str:
-    if not value:
-        return ""
-
-    return (
-        value.replace(" ", "")
-        .replace("　", "")
-        .replace("-", "")
-        .replace("_", "")
-        .replace("（", "(")
-        .replace("）", ")")
-        .strip()
-        .lower()
-    )
-
-
 def find_catalog_match(
     db: Session,
     barcode: str | None,
@@ -179,8 +221,8 @@ def find_catalog_match(
     raw_text: str | None,
     extracted_dosage: str | None = None,
     extracted_manufacturer: str | None = None,
-) -> Medicine | None:
-    result = match_catalog_medicine(
+) -> CatalogMatchResult:
+    return match_catalog_medicine(
         db=db,
         barcode=barcode,
         extracted_name=extracted_name,
@@ -189,7 +231,60 @@ def find_catalog_match(
         raw_text=raw_text,
     )
 
-    return result.medicine
+
+def should_use_openai_ocr(
+    cleaned_text: str | None,
+    confidence: float | None,
+    catalog_match: Medicine | None,
+) -> bool:
+    if not is_openai_ocr_enabled():
+        return False
+
+    if catalog_match:
+        return False
+
+    min_confidence = float(os.getenv("OPENAI_OCR_FALLBACK_CONFIDENCE", "0.75"))
+    min_text_length = int(os.getenv("OPENAI_OCR_MIN_TEXT_LENGTH", "20"))
+
+    if not cleaned_text:
+        return True
+
+    if len(cleaned_text.strip()) < min_text_length:
+        return True
+
+    if confidence is None:
+        return True
+
+    return confidence < min_confidence
+
+
+def should_accept_openai_ocr(
+    local_cleaned_text: str | None,
+    local_confidence: float | None,
+    openai_cleaned_text: str | None,
+    openai_confidence: float | None,
+    local_catalog_match: Medicine | None,
+    openai_catalog_match: Medicine | None,
+) -> bool:
+    if not openai_cleaned_text:
+        return False
+
+    if openai_catalog_match and not local_catalog_match:
+        return True
+
+    local_length = len(local_cleaned_text or "")
+    openai_length = len(openai_cleaned_text or "")
+
+    if openai_length >= max(20, local_length + 5):
+        return True
+
+    if openai_confidence is not None and local_confidence is not None:
+        return openai_confidence > local_confidence
+
+    if openai_confidence is not None and local_confidence is None:
+        return True
+
+    return False
 
 
 def save_upload_file(file: UploadFile) -> str:
@@ -228,6 +323,7 @@ def create_scan(
             raw_ocr_text=scan.raw_ocr_text,
             translated_text=scan.translated_text,
             manufacturer=scan.manufacturer,
+            ingredients=scan.ingredients,
             usage=scan.usage,
             dosage=scan.dosage,
             warnings=getattr(scan, "warnings", None),
@@ -251,6 +347,7 @@ def create_scan(
         db.refresh(new_scan)
 
         return new_scan
+
     except Exception as exc:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create scan: {str(exc)}")
@@ -269,6 +366,7 @@ def get_my_scans(
             .all()
         )
         return scans
+
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to fetch scans: {str(exc)}")
 
@@ -279,12 +377,11 @@ def upload_scan_image(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    save_path = None
-
     try:
         save_path = save_upload_file(file)
 
         barcode = extract_barcode(save_path)
+
         ocr_result = extract_text_with_confidence(save_path)
         raw_text = ocr_result.raw_text
         cleaned_text = ocr_result.cleaned_text or clean_text(raw_text)
@@ -294,7 +391,7 @@ def upload_scan_image(
         extracted_usage = extract_usage(cleaned_text)
         extracted_dosage = extract_dosage(cleaned_text) or extract_dosage(raw_text)
 
-        catalog_match = find_catalog_match(
+        catalog_result = find_catalog_match(
             db=db,
             barcode=barcode,
             extracted_name=extracted_name,
@@ -303,17 +400,72 @@ def upload_scan_image(
             extracted_manufacturer=extracted_manufacturer,
         )
 
+        catalog_match = catalog_result.medicine
+        ocr_engine = "tesseract"
+        fallback_used = False
+        fallback_error = None
+
+        if should_use_openai_ocr(
+            cleaned_text=cleaned_text,
+            confidence=ocr_result.confidence,
+            catalog_match=catalog_match,
+        ):
+            openai_result = extract_text_openai_vision(save_path)
+
+            if openai_result.status == "succeeded" and openai_result.cleaned_text:
+                openai_cleaned_text = openai_result.cleaned_text
+                openai_raw_text = openai_result.raw_text
+
+                openai_extracted_name = extract_medicine_name(openai_cleaned_text)
+                openai_extracted_manufacturer = extract_manufacturer(openai_cleaned_text)
+                openai_extracted_usage = extract_usage(openai_cleaned_text)
+                openai_extracted_dosage = (
+                    extract_dosage(openai_cleaned_text)
+                    or extract_dosage(openai_raw_text)
+                )
+
+                openai_catalog_result = find_catalog_match(
+                    db=db,
+                    barcode=barcode,
+                    extracted_name=openai_extracted_name,
+                    raw_text=openai_cleaned_text,
+                    extracted_dosage=openai_extracted_dosage,
+                    extracted_manufacturer=openai_extracted_manufacturer,
+                )
+
+                if should_accept_openai_ocr(
+                    local_cleaned_text=cleaned_text,
+                    local_confidence=ocr_result.confidence,
+                    openai_cleaned_text=openai_cleaned_text,
+                    openai_confidence=openai_result.confidence,
+                    local_catalog_match=catalog_match,
+                    openai_catalog_match=openai_catalog_result.medicine,
+                ):
+                    ocr_result = openai_result
+                    raw_text = openai_raw_text
+                    cleaned_text = openai_cleaned_text
+
+                    extracted_name = openai_extracted_name
+                    extracted_manufacturer = openai_extracted_manufacturer
+                    extracted_usage = openai_extracted_usage
+                    extracted_dosage = openai_extracted_dosage
+
+                    catalog_result = openai_catalog_result
+                    catalog_match = openai_catalog_result.medicine
+
+                    ocr_engine = "openai_vision"
+                    fallback_used = True
+            else:
+                fallback_error = openai_result.error
+
         if catalog_match:
-            medicine_name = (
-                catalog_match.canonical_name_en
-                or catalog_match.canonical_name_zh
-                or extracted_name
-            )
+            medicine_name = display_medicine_name(catalog_match)
             manufacturer = (
                 catalog_match.manufacturer_en
                 or catalog_match.manufacturer
                 or extracted_manufacturer
             )
+            ingredients = catalog_match.ingredients_en or catalog_match.ingredients
             usage = catalog_match.usage_en or catalog_match.usage or extracted_usage
             dosage = catalog_match.dosage or extracted_dosage
             warnings = extract_warning_text(
@@ -328,12 +480,14 @@ def upload_scan_image(
         else:
             medicine_name = extracted_name
             manufacturer = extracted_manufacturer
+            ingredients = None
             usage = extracted_usage
             dosage = extracted_dosage
             warnings = extract_warning_text(cleaned_text)
             translated_result = safe_explanation(
                 medicine_name=medicine_name,
                 manufacturer=manufacturer,
+                ingredients=ingredients,
                 usage=usage,
                 dosage=dosage,
                 raw_text=cleaned_text,
@@ -348,13 +502,24 @@ def upload_scan_image(
         ai_status = (
             "not_used_catalog_match" if catalog_match else get_ai_status(translated_result)
         )
+
         trust_notes = build_trust_notes(
             source_type=source_type,
             match_status=match_status,
             ocr_status=ocr_result.status,
             ai_status=ai_status,
-            ocr_error=ocr_result.error,
+            ocr_error=ocr_result.error or fallback_error,
+            catalog_reason=catalog_result.reason,
+            catalog_score=catalog_result.score,
         )
+
+        if fallback_used:
+            trust_notes += (
+                " Enhanced OCR fallback was used because the initial text extraction "
+                "was unclear or incomplete."
+            )
+        else:
+            trust_notes += " Standard OCR extraction was used."
 
         new_scan = ScanRecord(
             user_id=current_user.id,
@@ -365,6 +530,7 @@ def upload_scan_image(
             raw_ocr_text=cleaned_text,
             translated_text=translated_result,
             manufacturer=manufacturer,
+            ingredients=ingredients,
             usage=usage,
             dosage=dosage,
             warnings=warnings,
@@ -373,7 +539,7 @@ def upload_scan_image(
             ocr_status=ocr_result.status,
             ai_status=ai_status,
             ocr_confidence=ocr_result.confidence,
-            ai_confidence="medium" if ai_status == "succeeded" else None,
+            ai_confidence=None,
             trust_notes=trust_notes,
         )
 
@@ -415,20 +581,19 @@ def scan_by_barcode(
         if existing_scan:
             return existing_scan
 
-        catalog_match = find_catalog_match(
+        catalog_result = find_catalog_match(
             db=db,
             barcode=clean_barcode,
             extracted_name=None,
             raw_text=None,
         )
 
+        catalog_match = catalog_result.medicine
+
         if catalog_match:
-            medicine_name = (
-                catalog_match.canonical_name_en
-                or catalog_match.canonical_name_zh
-                or f"Barcode {clean_barcode}"
-            )
+            medicine_name = display_medicine_name(catalog_match)
             manufacturer = catalog_match.manufacturer_en or catalog_match.manufacturer
+            ingredients = catalog_match.ingredients_en or catalog_match.ingredients
             usage = (
                 catalog_match.usage_en
                 or catalog_match.usage
@@ -441,14 +606,16 @@ def scan_by_barcode(
         else:
             medicine_name = f"Barcode {clean_barcode}"
             manufacturer = None
+            ingredients = None
             usage = "Barcode-based lookup is limited in the current MVP."
             dosage = None
             warnings = None
             translated_result = safe_explanation(
                 medicine_name=medicine_name,
-                manufacturer=None,
+                manufacturer=manufacturer,
+                ingredients=ingredients,
                 usage=usage,
-                dosage=None,
+                dosage=dosage,
                 raw_text=f"Barcode input: {clean_barcode}",
             )
             medicine_id = None
@@ -458,11 +625,14 @@ def scan_by_barcode(
         ai_status = (
             "not_used_catalog_match" if catalog_match else get_ai_status(translated_result)
         )
+
         trust_notes = build_trust_notes(
             source_type=source_type,
             match_status=match_status,
             ocr_status="not_applicable",
             ai_status=ai_status,
+            catalog_reason=catalog_result.reason,
+            catalog_score=catalog_result.score,
         )
 
         new_scan = ScanRecord(
@@ -474,6 +644,7 @@ def scan_by_barcode(
             raw_ocr_text=f"Barcode input: {clean_barcode}",
             translated_text=translated_result,
             manufacturer=manufacturer,
+            ingredients=ingredients,
             usage=usage,
             dosage=dosage,
             warnings=warnings,
@@ -482,7 +653,7 @@ def scan_by_barcode(
             ocr_status="not_applicable",
             ai_status=ai_status,
             ocr_confidence=None,
-            ai_confidence="medium" if ai_status == "succeeded" else None,
+            ai_confidence=None,
             trust_notes=trust_notes,
         )
 
@@ -505,8 +676,6 @@ def upload_prescription(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    save_path = None
-
     try:
         save_path = save_upload_file(file)
 
@@ -514,9 +683,39 @@ def upload_prescription(
         raw_text = ocr_result.raw_text
         cleaned_text = ocr_result.cleaned_text or clean_text(raw_text)
 
+        ocr_engine = "tesseract"
+        fallback_used = False
+        fallback_error = None
+
+        if should_use_openai_ocr(
+            cleaned_text=cleaned_text,
+            confidence=ocr_result.confidence,
+            catalog_match=None,
+        ):
+            openai_result = extract_text_openai_vision(save_path)
+
+            if openai_result.status == "succeeded" and openai_result.cleaned_text:
+                if should_accept_openai_ocr(
+                    local_cleaned_text=cleaned_text,
+                    local_confidence=ocr_result.confidence,
+                    openai_cleaned_text=openai_result.cleaned_text,
+                    openai_confidence=openai_result.confidence,
+                    local_catalog_match=None,
+                    openai_catalog_match=None,
+                ):
+                    ocr_result = openai_result
+                    raw_text = openai_result.raw_text
+                    cleaned_text = openai_result.cleaned_text
+                    ocr_engine = "openai_vision"
+                    fallback_used = True
+            else:
+                fallback_error = openai_result.error
+
+        ingredients = None
         translated_result = safe_explanation(
             medicine_name=None,
             manufacturer=None,
+            ingredients=ingredients,
             usage=None,
             dosage=None,
             raw_text=cleaned_text,
@@ -525,23 +724,32 @@ def upload_prescription(
         source_type = "prescription_upload"
         match_status = "ocr_extracted" if cleaned_text else "unknown"
         ai_status = get_ai_status(translated_result)
+
         trust_notes = build_trust_notes(
             source_type=source_type,
             match_status=match_status,
             ocr_status=ocr_result.status,
             ai_status=ai_status,
-            ocr_error=ocr_result.error,
+            ocr_error=ocr_result.error or fallback_error,
         )
+
+        trust_notes += f" OCR engine used: {ocr_engine}."
+
+        if fallback_used:
+            trust_notes += (
+                " OpenAI Vision OCR fallback was used because local OCR was weak."
+            )
 
         new_record = ScanRecord(
             user_id=current_user.id,
             image_path=save_path,
             barcode=None,
             medicine_id=None,
-            medicine_name=None,
+            medicine_name="Prescription OCR",
             raw_ocr_text=cleaned_text,
             translated_text=translated_result,
             manufacturer=None,
+            ingredients=ingredients,
             usage=None,
             dosage=None,
             warnings=extract_warning_text(cleaned_text),
@@ -565,8 +773,81 @@ def upload_prescription(
     except Exception as exc:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to process prescription image: {str(exc)}")
+    
+    
 
+@router.post("/upload-report", response_model=ScanResponse)
+def upload_report(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        save_path = save_upload_file(file)
 
+        ocr_result = extract_text_with_confidence(save_path)
+        raw_text = ocr_result.raw_text
+        cleaned_text = ocr_result.cleaned_text or clean_text(raw_text)
+
+        translated_result = safe_explanation(
+            medicine_name=None,
+            manufacturer=None,
+            ingredients=None,
+            usage=None,
+            dosage=None,
+            raw_text=cleaned_text,
+        )
+
+        source_type = "report_upload"
+        match_status = "ocr_extracted" if cleaned_text else "unknown"
+        ai_status = get_ai_status(translated_result)
+
+        trust_notes = build_trust_notes(
+            source_type=source_type,
+            match_status=match_status,
+            ocr_status=ocr_result.status,
+            ai_status=ai_status,
+            ocr_error=ocr_result.error,
+        )
+
+        trust_notes += " OCR engine used: tesseract."
+
+        new_record = ScanRecord(
+            user_id=current_user.id,
+            image_path=save_path,
+            barcode=None,
+            medicine_id=None,
+            medicine_name="Medical Report OCR",
+            raw_ocr_text=cleaned_text,
+            translated_text=translated_result,
+            manufacturer=None,
+            ingredients=None,
+            usage=None,
+            dosage=None,
+            warnings=extract_warning_text(cleaned_text),
+            source_type=source_type,
+            match_status=match_status,
+            ocr_status=ocr_result.status,
+            ai_status=ai_status,
+            ocr_confidence=ocr_result.confidence,
+            ai_confidence="medium" if ai_status == "succeeded" else None,
+            trust_notes=trust_notes,
+        )
+
+        db.add(new_record)
+        db.commit()
+        db.refresh(new_record)
+
+        return new_record
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to process report image: {str(exc)}",
+        )
 class ScanQuestionRequest(BaseModel):
     scan_id: int
     question: str
@@ -602,9 +883,12 @@ def ask_about_scan(
     except Exception:
         answer = (
             f"Medicine: {scan.medicine_name or 'Unknown medicine'}\n"
+            f"Manufacturer: {scan.manufacturer or 'Not available'}\n"
+            f"Ingredients: {scan.ingredients or 'Not available'}\n"
             f"Usage: {scan.usage or 'Not available'}\n"
             f"Dosage: {scan.dosage or 'Not available'}\n"
-            "Note: AI service is temporarily unavailable, so this is a limited fallback answer."
+            "Note: AI service is temporarily unavailable, so this is a limited fallback answer. "
+            "Confirm important medicine decisions with a doctor or pharmacist."
         )
 
     return {

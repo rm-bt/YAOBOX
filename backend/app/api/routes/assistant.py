@@ -43,6 +43,70 @@ SAFE_FALLBACK_ANSWER = (
     "This response is a safe fallback, not medical advice."
 )
 
+EMERGENCY_KEYWORDS = [
+    "chest pain",
+    "can't breathe",
+    "cannot breathe",
+    "difficulty breathing",
+    "shortness of breath",
+    "severe allergic",
+    "anaphylaxis",
+    "swelling face",
+    "swollen face",
+    "swelling throat",
+    "fainting",
+    "passed out",
+    "unconscious",
+    "seizure",
+    "overdose",
+    "took too much",
+    "suicide",
+    "self harm",
+    "blood in stool",
+    "vomiting blood",
+    "severe rash",
+    "急救",
+    "胸痛",
+    "呼吸困难",
+    "过敏性休克",
+    "昏倒",
+    "抽搐",
+    "服药过量",
+]
+
+MEDICATION_DECISION_PATTERNS = [
+    "can i stop",
+    "should i stop",
+    "stop taking",
+    "can i quit",
+    "should i quit",
+    "can i take",
+    "should i take",
+    "can i combine",
+    "can i mix",
+    "mix with",
+    "take together",
+    "increase dose",
+    "decrease dose",
+    "change dose",
+    "change dosage",
+    "replace my medicine",
+    "switch medicine",
+    "is it safe for me",
+    "safe for me",
+    "how many should i take",
+    "what dose",
+    "what dosage",
+    "我可以停",
+    "能不能停",
+    "可以一起吃",
+    "能一起吃",
+    "剂量",
+    "加量",
+    "减量",
+    "换药",
+]
+
 
 class AssistantRequest(BaseModel):
     question: str = Field(..., min_length=3, max_length=MAX_ASSISTANT_QUESTION_LENGTH)
@@ -76,6 +140,50 @@ def load_backend_env() -> None:
 
             if key and key not in os.environ:
                 os.environ[key] = value
+
+
+def normalize_text(value: str | None) -> str:
+    return (value or "").strip().lower()
+
+
+def contains_any(text: str, patterns: list[str]) -> bool:
+    return any(pattern.lower() in text for pattern in patterns)
+
+
+def build_emergency_answer() -> str:
+    return (
+        "This could be urgent. Do not rely on this app for emergency symptoms.\n\n"
+        "What to do now:\n"
+        "- Seek urgent medical help immediately.\n"
+        "- Contact local emergency services or go to the nearest emergency department.\n"
+        "- If possible, bring the medicine package, prescription, or scan result with you.\n"
+        "- Do not take more medicine while waiting unless a medical professional tells you to.\n\n"
+        "YAOBOX cannot assess emergency symptoms or decide whether a medicine caused them."
+    )
+
+
+def build_medication_decision_answer() -> str:
+    return (
+        "I cannot tell you to start, stop, combine, replace, or change the dose of a medicine.\n\n"
+        "Safer next steps:\n"
+        "- Ask a doctor or pharmacist before changing how you take it.\n"
+        "- Show them the medicine package, prescription, and any scan result.\n"
+        "- Ask whether it interacts with other medicines, alcohol, supplements, or health conditions.\n"
+        "- If you feel worse or have unusual symptoms, seek medical help promptly.\n\n"
+        "I can help you prepare questions for a pharmacist, but I cannot make the medication decision for you."
+    )
+
+
+def deterministic_safety_answer(question: str, context: str | None) -> str | None:
+    combined = normalize_text(f"{question}\n{context or ''}")
+
+    if contains_any(combined, EMERGENCY_KEYWORDS):
+        return build_emergency_answer()
+
+    if contains_any(combined, MEDICATION_DECISION_PATTERNS):
+        return build_medication_decision_answer()
+
+    return None
 
 
 def shorten_answer(answer: str) -> str:
@@ -133,6 +241,17 @@ def chat_with_assistant(
     payload: AssistantRequest,
     current_user: User = Depends(get_current_user),
 ):
+    guardrail_answer = deterministic_safety_answer(
+        question=payload.question,
+        context=payload.context,
+    )
+
+    if guardrail_answer:
+        return AssistantResponse(
+            answer=guardrail_answer,
+            safety_note=SAFETY_NOTE,
+        )
+
     load_backend_env()
 
     api_key = os.getenv("GEMINI_API_KEY", "").strip()

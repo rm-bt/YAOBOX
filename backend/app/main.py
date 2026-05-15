@@ -1,6 +1,5 @@
-
-
 import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -9,9 +8,6 @@ from sqlalchemy import inspect, text
 from .api.routes import auth, scans, reminders, users, history, assistant
 from app.api.routes.medicines import router as medicines_router
 from app.core.database import Base, engine
-
-# Debug to confirm env is loaded
-print("DB URL:", os.getenv("DATABASE_URL"))
 
 
 def ensure_scan_trust_columns() -> None:
@@ -51,7 +47,7 @@ app = FastAPI(title="Yaobox API", version="0.1.0")
 
 
 @app.on_event("startup")
-def startup():
+def startup() -> None:
     Base.metadata.create_all(bind=engine)
     ensure_scan_trust_columns()
     os.makedirs("uploads", exist_ok=True)
@@ -67,7 +63,7 @@ app.add_middleware(
         "http://localhost:3000",
         "http://127.0.0.1:3000",
     ],
-    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
+    allow_origin_regex=r"http://(localhost|127\\.0\\.0\\.1):\\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

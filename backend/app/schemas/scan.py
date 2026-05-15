@@ -9,6 +9,7 @@ class ScanCreate(BaseModel):
     translated_text: str | None = None
     barcode: str | None = None
     manufacturer: str | None = None
+    ingredients: str | None = None
     usage: str | None = None
     dosage: str | None = None
     warnings: str | None = None
@@ -35,6 +36,7 @@ class ScanResponse(BaseModel):
     raw_ocr_text: str | None = None
     translated_text: str | None = None
     manufacturer: str | None = None
+    ingredients: str | None = None
     usage: str | None = None
     dosage: str | None = None
     warnings: str | None = None

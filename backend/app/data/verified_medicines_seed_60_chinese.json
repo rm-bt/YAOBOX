@@ -17,9 +17,7 @@
       "布洛芬缓释胶囊",
       "芬必得",
       "ibuprofen"
-    ],
-    "ingredients": "布洛芬",
-    "ingredients_en": "Ibuprofen"
+    ]
   },
   {
     "barcode": null,
@@ -37,9 +35,7 @@
       "布洛芬片",
       "布洛芬",
       "ibuprofen tablet"
-    ],
-    "ingredients": "布洛芬",
-    "ingredients_en": "Ibuprofen"
+    ]
   },
   {
     "barcode": null,
@@ -59,9 +55,7 @@
       "泰诺",
       "paracetamol",
       "acetaminophen"
-    ],
-    "ingredients": "对乙酰氨基酚",
-    "ingredients_en": "Paracetamol / Acetaminophen"
+    ]
   },
   {
     "barcode": null,
@@ -79,9 +73,7 @@
       "对乙酰氨基酚混悬液",
       "儿童退热",
       "paracetamol suspension"
-    ],
-    "ingredients": "对乙酰氨基酚",
-    "ingredients_en": "Paracetamol / Acetaminophen"
+    ]
   },
   {
     "barcode": null,
@@ -99,9 +91,7 @@
       "连花清瘟",
       "莲花清瘟",
       "lianhua qingwen"
-    ],
-    "ingredients": null,
-    "ingredients_en": null
+    ]
   },
   {
     "barcode": null,
@@ -119,9 +109,7 @@
       "感冒灵",
       "感冒灵颗粒",
       "ganmaoling"
-    ],
-    "ingredients": null,
-    "ingredients_en": null
+    ]
   },
   {
     "barcode": null,
@@ -139,9 +127,7 @@
       "板蓝根",
       "板蓝根颗粒",
       "banlangen"
-    ],
-    "ingredients": null,
-    "ingredients_en": null
+    ]
   },
   {
     "barcode": null,
@@ -159,9 +145,7 @@
       "藿香正气",
       "藿香正气水",
       "huoxiang zhengqi"
-    ],
-    "ingredients": null,
-    "ingredients_en": null
+    ]
   },
   {
     "barcode": null,
@@ -178,9 +162,7 @@
     "search_aliases": [
       "藿香正气胶囊",
       "藿香正气"
-    ],
-    "ingredients": null,
-    "ingredients_en": null
+    ]
   },
   {
     "barcode": null,
@@ -198,9 +180,7 @@
       "复方氨酚烷胺",
       "氨酚烷胺",
       "感康"
-    ],
-    "ingredients": null,
-    "ingredients_en": null
+    ]
   },
   {
     "barcode": null,
@@ -218,9 +198,7 @@
       "维C银翘",
       "维c银翘",
       "vc银翘"
-    ],
-    "ingredients": null,
-    "ingredients_en": null
+    ]
   },
   {
     "barcode": null,
@@ -237,9 +215,7 @@
     "search_aliases": [
       "双黄连",
       "双黄连口服液"
-    ],
-    "ingredients": null,
-    "ingredients_en": null
+    ]
   },
   {
     "barcode": null,
@@ -257,9 +233,7 @@
       "蒲地蓝",
       "蒲地蓝消炎",
       "pudilan"
-    ],
-    "ingredients": null,
-    "ingredients_en": null
+    ]
   },
   {
     "barcode": null,
@@ -277,9 +251,7 @@
       "阿莫西林",
       "阿莫西林胶囊",
       "amoxicillin"
-    ],
-    "ingredients": "阿莫西林",
-    "ingredients_en": "Amoxicillin"
+    ]
   },
   {
     "barcode": null,
@@ -297,9 +269,7 @@
       "头孢克洛",
       "头孢克洛胶囊",
       "cefaclor"
-    ],
-    "ingredients": "头孢克洛",
-    "ingredients_en": "Cefaclor"
+    ]
   },
   {
     "barcode": null,
@@ -317,9 +287,7 @@
       "头孢拉定",
       "头孢拉定胶囊",
       "cefradine"
-    ],
-    "ingredients": "头孢拉定",
-    "ingredients_en": "Cefradine"
+    ]
   },
   {
     "barcode": null,
@@ -337,9 +305,7 @@
       "阿奇霉素",
       "阿奇霉素片",
       "azithromycin"
-    ],
-    "ingredients": "阿奇霉素",
-    "ingredients_en": "Azithromycin"
+    ]
   },
   {
     "barcode": null,
@@ -357,9 +323,7 @@
       "罗红霉素",
       "罗红霉素胶囊",
       "roxithromycin"
-    ],
-    "ingredients": "罗红霉素",
-    "ingredients_en": "Roxithromycin"
+    ]
   },
   {
     "barcode": null,
@@ -377,9 +341,7 @@
       "奥美拉唑",
       "奥美拉唑肠溶胶囊",
       "omeprazole"
-    ],
-    "ingredients": "奥美拉唑",
-    "ingredients_en": "Omeprazole"
+    ]
   },
   {
     "barcode": null,
@@ -397,9 +359,7 @@
       "雷贝拉唑",
       "雷贝拉唑钠",
       "rabeprazole"
-    ],
-    "ingredients": "雷贝拉唑钠",
-    "ingredients_en": "Rabeprazole Sodium"
+    ]
   },
   {
     "barcode": null,
@@ -417,9 +377,7 @@
       "铝碳酸镁",
       "达喜",
       "hydrotalcite"
-    ],
-    "ingredients": "铝碳酸镁",
-    "ingredients_en": "Hydrotalcite"
+    ]
   },
   {
     "barcode": null,
@@ -437,9 +395,7 @@
       "多潘立酮",
       "吗丁啉",
       "domperidone"
-    ],
-    "ingredients": "多潘立酮",
-    "ingredients_en": "Domperidone"
+    ]
   },
   {
     "barcode": null,
@@ -458,9 +414,7 @@
       "蒙脱石散",
       "思密达",
       "smecta"
-    ],
-    "ingredients": "蒙脱石",
-    "ingredients_en": "Montmorillonite"
+    ]
   },
   {
     "barcode": null,
@@ -478,9 +432,7 @@
       "口服补液盐",
       "补液盐",
       "ORS"
-    ],
-    "ingredients": null,
-    "ingredients_en": null
+    ]
   },
   {
     "barcode": null,
@@ -498,9 +450,7 @@
       "氨溴索",
       "盐酸氨溴索",
       "ambroxol"
-    ],
-    "ingredients": "盐酸氨溴索",
-    "ingredients_en": "Ambroxol Hydrochloride"
+    ]
   },
   {
     "barcode": null,
@@ -517,9 +467,7 @@
     "search_aliases": [
       "复方甘草片",
       "甘草片"
-    ],
-    "ingredients": null,
-    "ingredients_en": null
+    ]
   },
   {
     "barcode": null,
@@ -537,9 +485,7 @@
       "右美沙芬",
       "愈创甘油醚",
       "止咳糖浆"
-    ],
-    "ingredients": null,
-    "ingredients_en": null
+    ]
   },
   {
     "barcode": null,
@@ -557,9 +503,7 @@
       "氯雷他定",
       "开瑞坦",
       "loratadine"
-    ],
-    "ingredients": "氯雷他定",
-    "ingredients_en": "Loratadine"
+    ]
   },
   {
     "barcode": null,
@@ -577,9 +521,7 @@
       "西替利嗪",
       "盐酸西替利嗪",
       "cetirizine"
-    ],
-    "ingredients": "盐酸西替利嗪",
-    "ingredients_en": "Cetirizine Hydrochloride"
+    ]
   },
   {
     "barcode": null,
@@ -597,9 +539,7 @@
       "扑尔敏",
       "氯苯那敏",
       "chlorphenamine"
-    ],
-    "ingredients": "马来酸氯苯那敏",
-    "ingredients_en": "Chlorphenamine Maleate"
+    ]
   },
   {
     "barcode": null,
@@ -616,9 +556,7 @@
     "search_aliases": [
       "地氯雷他定",
       "desloratadine"
-    ],
-    "ingredients": "地氯雷他定",
-    "ingredients_en": "Desloratadine"
+    ]
   },
   {
     "barcode": null,
@@ -637,9 +575,7 @@
       "维生素c",
       "vc片",
       "vitamin c"
-    ],
-    "ingredients": "维生素C",
-    "ingredients_en": "Vitamin C / Ascorbic Acid"
+    ]
   },
   {
     "barcode": null,
@@ -657,9 +593,7 @@
       "维生素B2",
       "核黄素",
       "riboflavin"
-    ],
-    "ingredients": "维生素B2",
-    "ingredients_en": "Vitamin B2 / Riboflavin"
+    ]
   },
   {
     "barcode": null,
@@ -677,9 +611,7 @@
       "维生素B6",
       "吡哆醇",
       "pyridoxine"
-    ],
-    "ingredients": "维生素B6",
-    "ingredients_en": "Vitamin B6 / Pyridoxine"
+    ]
   },
   {
     "barcode": null,
@@ -697,9 +629,7 @@
       "葡萄糖酸钙",
       "钙片",
       "calcium gluconate"
-    ],
-    "ingredients": "葡萄糖酸钙",
-    "ingredients_en": "Calcium Gluconate"
+    ]
   },
   {
     "barcode": null,
@@ -716,9 +646,7 @@
     "search_aliases": [
       "开塞露",
       "glycerin enema"
-    ],
-    "ingredients": "甘油",
-    "ingredients_en": "Glycerin"
+    ]
   },
   {
     "barcode": null,
@@ -736,9 +664,7 @@
       "云南白药",
       "云南白药气雾剂",
       "yunnan baiyao"
-    ],
-    "ingredients": null,
-    "ingredients_en": null
+    ]
   },
   {
     "barcode": null,
@@ -756,9 +682,7 @@
       "红霉素软膏",
       "红霉素",
       "erythromycin ointment"
-    ],
-    "ingredients": "红霉素",
-    "ingredients_en": "Erythromycin"
+    ]
   },
   {
     "barcode": null,
@@ -776,9 +700,7 @@
       "莫匹罗星",
       "百多邦",
       "mupirocin"
-    ],
-    "ingredients": "莫匹罗星",
-    "ingredients_en": "Mupirocin"
+    ]
   },
   {
     "barcode": null,
@@ -796,9 +718,7 @@
       "炉甘石",
       "炉甘石洗剂",
       "calamine"
-    ],
-    "ingredients": "炉甘石",
-    "ingredients_en": "Calamine"
+    ]
   },
   {
     "barcode": null,
@@ -816,9 +736,7 @@
       "地塞米松乳膏",
       "复方醋酸地塞米松",
       "皮炎平"
-    ],
-    "ingredients": null,
-    "ingredients_en": null
+    ]
   },
   {
     "barcode": null,
@@ -836,9 +754,7 @@
       "特比萘芬",
       "盐酸特比萘芬",
       "terbinafine"
-    ],
-    "ingredients": "盐酸特比萘芬",
-    "ingredients_en": "Terbinafine Hydrochloride"
+    ]
   },
   {
     "barcode": null,
@@ -856,9 +772,7 @@
       "阿昔洛韦",
       "阿昔洛韦乳膏",
       "acyclovir"
-    ],
-    "ingredients": "阿昔洛韦",
-    "ingredients_en": "Aciclovir / Acyclovir"
+    ]
   },
   {
     "barcode": null,
@@ -875,9 +789,7 @@
     "search_aliases": [
       "甲硝唑",
       "metronidazole"
-    ],
-    "ingredients": "甲硝唑",
-    "ingredients_en": "Metronidazole"
+    ]
   },
   {
     "barcode": null,
@@ -894,9 +806,7 @@
     "search_aliases": [
       "左氧氟沙星",
       "levofloxacin"
-    ],
-    "ingredients": "左氧氟沙星",
-    "ingredients_en": "Levofloxacin"
+    ]
   },
   {
     "barcode": null,
@@ -913,9 +823,7 @@
     "search_aliases": [
       "诺氟沙星",
       "norfloxacin"
-    ],
-    "ingredients": "诺氟沙星",
-    "ingredients_en": "Norfloxacin"
+    ]
   },
   {
     "barcode": null,
@@ -933,9 +841,7 @@
       "小檗碱",
       "黄连素",
       "berberine"
-    ],
-    "ingredients": "盐酸小檗碱",
-    "ingredients_en": "Berberine Hydrochloride"
+    ]
   },
   {
     "barcode": null,
@@ -952,9 +858,7 @@
     "search_aliases": [
       "健胃消食",
       "健胃消食片"
-    ],
-    "ingredients": null,
-    "ingredients_en": null
+    ]
   },
   {
     "barcode": null,
@@ -971,9 +875,7 @@
     "search_aliases": [
       "保济丸",
       "baoji"
-    ],
-    "ingredients": null,
-    "ingredients_en": null
+    ]
   },
   {
     "barcode": null,
@@ -990,9 +892,7 @@
     "search_aliases": [
       "牛黄解毒",
       "牛黄解毒片"
-    ],
-    "ingredients": null,
-    "ingredients_en": null
+    ]
   },
   {
     "barcode": null,
@@ -1009,9 +909,7 @@
     "search_aliases": [
       "清热解毒",
       "清热解毒口服液"
-    ],
-    "ingredients": null,
-    "ingredients_en": null
+    ]
   },
   {
     "barcode": null,
@@ -1029,9 +927,7 @@
       "复方丹参",
       "丹参片",
       "danshen"
-    ],
-    "ingredients": null,
-    "ingredients_en": null
+    ]
   },
   {
     "barcode": null,
@@ -1048,9 +944,7 @@
     "search_aliases": [
       "速效救心丸",
       "救心丸"
-    ],
-    "ingredients": null,
-    "ingredients_en": null
+    ]
   },
   {
     "barcode": null,
@@ -1067,9 +961,7 @@
     "search_aliases": [
       "硝酸甘油",
       "nitroglycerin"
-    ],
-    "ingredients": "硝酸甘油",
-    "ingredients_en": "Nitroglycerin"
+    ]
   },
   {
     "barcode": null,
@@ -1087,9 +979,7 @@
       "二甲双胍",
       "盐酸二甲双胍",
       "metformin"
-    ],
-    "ingredients": "盐酸二甲双胍",
-    "ingredients_en": "Metformin Hydrochloride"
+    ]
   },
   {
     "barcode": null,
@@ -1106,9 +996,7 @@
     "search_aliases": [
       "阿卡波糖",
       "acarbose"
-    ],
-    "ingredients": "阿卡波糖",
-    "ingredients_en": "Acarbose"
+    ]
   },
   {
     "barcode": null,
@@ -1125,9 +1013,7 @@
     "search_aliases": [
       "格列齐特",
       "gliclazide"
-    ],
-    "ingredients": "格列齐特",
-    "ingredients_en": "Gliclazide"
+    ]
   },
   {
     "barcode": null,
@@ -1145,9 +1031,7 @@
       "氨氯地平",
       "苯磺酸氨氯地平",
       "amlodipine"
-    ],
-    "ingredients": "苯磺酸氨氯地平",
-    "ingredients_en": "Amlodipine Besylate"
+    ]
   },
   {
     "barcode": null,
@@ -1164,9 +1048,7 @@
     "search_aliases": [
       "厄贝沙坦",
       "irbesartan"
-    ],
-    "ingredients": "厄贝沙坦",
-    "ingredients_en": "Irbesartan"
+    ]
   },
   {
     "barcode": null,
@@ -1183,9 +1065,7 @@
     "search_aliases": [
       "阿托伐他汀",
       "atorvastatin"
-    ],
-    "ingredients": "阿托伐他汀钙",
-    "ingredients_en": "Atorvastatin Calcium"
+    ]
   },
   {
     "barcode": null,
@@ -1202,9 +1082,7 @@
     "search_aliases": [
       "辛伐他汀",
       "simvastatin"
-    ],
-    "ingredients": "辛伐他汀",
-    "ingredients_en": "Simvastatin"
+    ]
   },
   {
     "barcode": null,
@@ -1223,9 +1101,7 @@
       "硫酸沙丁胺醇",
       "salbutamol",
       "albuterol"
-    ],
-    "ingredients": "硫酸沙丁胺醇",
-    "ingredients_en": "Salbutamol Sulfate / Albuterol Sulfate"
+    ]
   },
   {
     "barcode": null,
@@ -1242,9 +1118,7 @@
     "search_aliases": [
       "特布他林",
       "terbutaline"
-    ],
-    "ingredients": "硫酸特布他林",
-    "ingredients_en": "Terbutaline Sulfate"
+    ]
   },
   {
     "barcode": null,
@@ -1262,9 +1136,7 @@
       "氟桂利嗪",
       "盐酸氟桂利嗪",
       "flunarizine"
-    ],
-    "ingredients": "盐酸氟桂利嗪",
-    "ingredients_en": "Flunarizine Hydrochloride"
+    ]
   },
   {
     "barcode": null,
@@ -1281,9 +1153,7 @@
     "search_aliases": [
       "甲钴胺",
       "mecobalamin"
-    ],
-    "ingredients": "甲钴胺",
-    "ingredients_en": "Mecobalamin"
+    ]
   },
   {
     "barcode": null,
@@ -1301,9 +1171,7 @@
       "氨基葡萄糖",
       "盐酸氨基葡萄糖",
       "glucosamine"
-    ],
-    "ingredients": "盐酸氨基葡萄糖",
-    "ingredients_en": "Glucosamine Hydrochloride"
+    ]
   },
   {
     "barcode": null,
@@ -1320,9 +1188,7 @@
     "search_aliases": [
       "枸橼酸铋钾",
       "bismuth"
-    ],
-    "ingredients": "枸橼酸铋钾",
-    "ingredients_en": "Bismuth Potassium Citrate"
+    ]
   },
   {
     "barcode": null,
@@ -1339,9 +1205,7 @@
     "search_aliases": [
       "乳酸菌素",
       "lactasin"
-    ],
-    "ingredients": null,
-    "ingredients_en": null
+    ]
   },
   {
     "barcode": null,
@@ -1359,9 +1223,7 @@
       "洛哌丁胺",
       "易蒙停",
       "loperamide"
-    ],
-    "ingredients": "盐酸洛哌丁胺",
-    "ingredients_en": "Loperamide Hydrochloride"
+    ]
   },
   {
     "barcode": null,
@@ -1379,9 +1241,7 @@
       "氯己定含漱液",
       "复方氯己定",
       "chlorhexidine"
-    ],
-    "ingredients": "氯己定等复方成分",
-    "ingredients_en": "Chlorhexidine and compound ingredients"
+    ]
   },
   {
     "barcode": null,
@@ -1399,9 +1259,7 @@
       "酮康唑",
       "复方酮康唑",
       "ketoconazole"
-    ],
-    "ingredients": null,
-    "ingredients_en": null
+    ]
   },
   {
     "barcode": null,
@@ -1419,9 +1277,7 @@
       "玻璃酸钠",
       "人工泪液",
       "sodium hyaluronate"
-    ],
-    "ingredients": "玻璃酸钠",
-    "ingredients_en": "Sodium Hyaluronate"
+    ]
   },
   {
     "barcode": null,
@@ -1439,38 +1295,34 @@
       "左炔诺孕酮",
       "紧急避孕药",
       "levonorgestrel"
-    ],
-    "ingredients": "左炔诺孕酮",
-    "ingredients_en": "Levonorgestrel"
+    ]
   },
   {
-    "barcode": null,
-    "canonical_name_zh": "感冒灵颗粒",
-    "canonical_name_en": "Ganmaoling Granules",
-    "manufacturer": "华润三九医药股份有限公司",
-    "manufacturer_en": "China Resources Sanjiu Medical & Pharmaceutical Co., Ltd.",
-    "usage": "用于感冒引起的头痛、发热、鼻塞、流涕、咽痛等症状的缓解。",
-    "usage_en": "Used to relieve cold symptoms such as headache, fever, nasal congestion, runny nose, and sore throat.",
-    "dosage": "请按照药品说明书或医生/药师指导使用。不同规格和厂家可能存在差异。",
-    "warnings": "可能含有西药成分。服用期间避免饮酒，不要同时服用成分相似的感冒药。驾驶或操作机器前应注意是否嗜睡。",
-    "warnings_en": "May contain western-medicine ingredients depending on the product. Avoid alcohol and do not combine with similar cold medicines. Be careful with driving or machinery if drowsiness occurs.",
-    "is_verified": true,
-    "search_aliases": [
-      "999",
-      "三九",
-      "感冒灵",
-      "感冒灵颗粒",
-      "999感冒灵",
-      "999感冒灵颗粒",
-      "头痛",
-      "发热",
-      "鼻塞",
-      "流涕",
-      "咽痛",
-      "ganmaoling",
-      "ganmaoling granules"
-    ],
-    "ingredients": null,
-    "ingredients_en": null
-  }
+  "barcode": null,
+  "canonical_name_zh": "感冒灵颗粒",
+  "canonical_name_en": "Ganmaoling Granules",
+  "manufacturer": "华润三九医药股份有限公司",
+  "manufacturer_en": "China Resources Sanjiu Medical & Pharmaceutical Co., Ltd.",
+  "usage": "用于感冒引起的头痛、发热、鼻塞、流涕、咽痛等症状的缓解。",
+  "usage_en": "Used to relieve cold symptoms such as headache, fever, nasal congestion, runny nose, and sore throat.",
+  "dosage": "请按照药品说明书或医生/药师指导使用。不同规格和厂家可能存在差异。",
+  "warnings": "可能含有西药成分。服用期间避免饮酒，不要同时服用成分相似的感冒药。驾驶或操作机器前应注意是否嗜睡。",
+  "warnings_en": "May contain western-medicine ingredients depending on the product. Avoid alcohol and do not combine with similar cold medicines. Be careful with driving or machinery if drowsiness occurs.",
+  "is_verified": true,
+  "search_aliases": [
+    "999",
+    "三九",
+    "感冒灵",
+    "感冒灵颗粒",
+    "999感冒灵",
+    "999感冒灵颗粒",
+    "头痛",
+    "发热",
+    "鼻塞",
+    "流涕",
+    "咽痛",
+    "ganmaoling",
+    "ganmaoling granules"
+  ]
+}
 ]
