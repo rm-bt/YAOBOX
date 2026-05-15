@@ -42,12 +42,19 @@ function navClass(isActive: boolean) {
   ].join(" ");
 }
 
+function getPageTitle(pathname: string) {
+  const match = navItems.find((item) => pathname.startsWith(item.to));
+  return match?.label ?? "Yaobox";
+}
+
 export function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const clearSession = useAuthStore((state) => state.clearSession);
   const { avatar } = useAvatar();
   const { theme } = useTheme();
+
+  const pageTitle = getPageTitle(location.pathname);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
@@ -122,12 +129,10 @@ export function AppShell() {
         <div className="min-w-0 flex-1">
           <header className="app-shell-header sticky top-0 z-30 border-b border-[#e7ebdf] bg-[#f6f8f4]/95 backdrop-blur">
             <div className="flex items-center gap-4 px-5 py-5 lg:px-8">
-              <div className="hidden md:flex min-h-14 w-full max-w-[560px] items-center rounded-[24px] border border-[#d9e1ee] bg-white px-5 text-[#46536a] shadow-sm">
-                <p className="text-sm font-medium leading-relaxed">
-                  YAOBOX separates verified catalog data, OCR text, and AI
-                  explanation. Review important medicine decisions with a
-                  professional.
-                </p>
+              <div className="hidden md:flex min-h-14 w-full max-w-[560px] items-center rounded-[24px] border border-[#d9e1ee] bg-white px-5 text-[#13224a] shadow-sm">
+                <h1 className="text-2xl font-bold tracking-tight">
+                  {pageTitle}
+                </h1>
               </div>
 
               <div className="ml-auto flex items-center gap-3 lg:gap-5">

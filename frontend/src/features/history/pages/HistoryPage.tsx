@@ -49,6 +49,38 @@ function firstNonEmptyString(...values: unknown[]): string {
   return "";
 }
 
+function containsChinese(text: string): boolean {
+  return /[\u3400-\u9fff]/.test(text);
+}
+
+function cleanPreviewText(value: string): string {
+  if (!value.trim()) return "Preview unavailable.";
+
+  return value
+    .replace(/English Translation:/gi, "")
+    .replace(/Simple Explanation:/gi, "")
+    .replace(/Safety Note:/gi, "")
+    .replace(/Trust:/gi, "")
+    .replace(/Medicine:/gi, "")
+    .replace(/Manufacturer:/gi, "")
+    .replace(/Warnings:/gi, "")
+    .replace(/Dosage:/gi, "")
+    .replace(/Usage:/gi, "")
+    .replace(/Ingredients:/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildEnglishReminderNote(value: unknown): string {
+  const raw = firstNonEmptyString(value);
+
+  if (!raw) return "";
+
+  if (!containsChinese(raw)) return raw;
+
+  return "Follow the medicine label or doctor/pharmacist instructions. Dosage may vary by product specification and manufacturer.";
+}
+
 function asWarningList(value: unknown): string[] {
   if (Array.isArray(value)) {
     return value
@@ -78,9 +110,7 @@ function formatDateLabel(value: unknown): string {
 function buildImageUrl(rawPath: unknown): string | null {
   const imagePath = firstNonEmptyString(rawPath);
 
-  if (!imagePath || imagePath === "null") {
-    return null;
-  }
+  if (!imagePath || imagePath === "null") return null;
 
   const normalized = imagePath.replace(/\\/g, "/");
 
@@ -143,10 +173,10 @@ function normalizeHistoryItem(raw: ScanHistoryItem): HistoryItem {
     confidenceLabel: confidence.confidenceLabel,
     translatedSummary:
       firstNonEmptyString(raw.translated_text, raw.usage) ||
-      "English explanation not available.",
+      "Machine translation not available.",
     extractedText:
-  firstNonEmptyString(raw.raw_ocr_text, raw.raw_text) ||
-  "Original extracted text not available.",
+      firstNonEmptyString(raw.raw_ocr_text, raw.raw_text) ||
+      "Original OCR text not available.",
     dosage:
       firstNonEmptyString(raw.dosage, raw.usage) ||
       "Dosage not extracted clearly.",
@@ -156,7 +186,7 @@ function normalizeHistoryItem(raw: ScanHistoryItem): HistoryItem {
     matchStatus: firstNonEmptyString(raw.match_status) || "unknown",
     trustNotes:
       firstNonEmptyString(raw.trust_notes) ||
-      "No trust notes were returned by the backend.",
+      "No technical trust details were returned.",
   };
 }
 
@@ -184,6 +214,33 @@ function previewIcon(recordType: HistoryItem["recordType"]) {
   }
 
   return <Pill className="w-8 h-8 text-brand-secondary -rotate-45" />;
+}
+
+function historyPreview(item: HistoryItem): string {
+  const limit =
+    item.recordType === "prescription" || item.recordType === "report"
+      ? 180
+      : 140;
+
+  return cleanPreviewText(item.translatedSummary).slice(0, limit);
+}
+
+function userFacingTrustNote(item: HistoryItem): string {
+  if (item.recordType === "medicine") {
+    return "Medicine scan with OCR, catalogue matching, and translation support.";
+  }
+
+  if (item.recordType === "prescription") {
+    return "Prescription OCR and machine translation result. Verify important details before use.";
+  }
+
+  return "Medical report OCR and machine translation result. This is not a diagnosis.";
+}
+
+function explanationTitle(item: HistoryItem): string {
+  return item.recordType === "medicine"
+    ? "English explanation"
+    : "Machine translation";
 }
 
 export default function HistoryPage() {
@@ -231,6 +288,7 @@ export default function HistoryPage() {
       return [
         item.title,
         item.translatedSummary,
+        item.extractedText,
         item.dosage,
         item.sourceType,
         item.matchStatus,
@@ -264,14 +322,14 @@ export default function HistoryPage() {
               Scan history
             </h1>
             <p className="text-lg text-slate-600 max-w-3xl leading-relaxed mt-3">
-              Reopen prior scan results fast. Keep the list searchable and honest
-              about source, confidence, OCR text, and AI explanation.
+              Review saved medicine scans, translated documents, OCR confidence,
+              and reminder-ready results.
             </p>
           </div>
 
           <div className="inline-flex items-center gap-2 rounded-full bg-brand-primary-container/40 px-4 py-2 text-sm font-semibold text-brand-on-primary-container">
             <ShieldCheck size={16} />
-            History reflects saved scan records from the backend.
+            Saved OCR and translation records
           </div>
         </div>
       </header>
@@ -296,7 +354,7 @@ export default function HistoryPage() {
             {historyQuery.isLoading ? "..." : String(lowConfidenceCount)}
           </div>
           <div className="text-slate-500 font-medium mt-2">
-            Low-confidence records
+            Needs manual review
           </div>
         </div>
       </section>
@@ -364,23 +422,27 @@ export default function HistoryPage() {
           </div>
         </section>
       ) : filteredItems.length === 0 ? (
-        <section className="rounded-[28px] bg-white border border-slate-100 p-8 shadow-sm text-center">
-          <CalendarDays className="w-12 h-12 mx-auto text-slate-300" />
-          <h2 className="text-2xl font-bold text-slate-900 mt-4">
-            No history records found
-          </h2>
-          <p className="text-slate-600 max-w-2xl mx-auto mt-3 leading-relaxed">
-            Scan a medicine or prescription first, then return here.
-          </p>
-          <div className="mt-6">
-            <Link
-              to="/scan"
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-brand-secondary px-6 py-3.5 text-white font-bold shadow-lg shadow-brand-secondary/20 hover:brightness-95 transition-all"
-            >
-              Go to scan
-              <ChevronRight className="w-4 h-4" />
-            </Link>
+        <section className="rounded-[32px] border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm">
+          <div className="mx-auto w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-5">
+            <Search className="w-7 h-7 text-slate-400" />
           </div>
+
+          <h3 className="text-2xl font-bold text-slate-900 mb-2">
+            No matching history records
+          </h3>
+
+          <p className="text-slate-500 max-w-md mx-auto leading-relaxed">
+            Try another keyword or create a new medicine scan, prescription OCR,
+            or report OCR record.
+          </p>
+
+          <Link
+            to="/scan"
+            className="inline-flex items-center gap-2 mt-8 rounded-full bg-brand-primary text-white px-6 py-3 font-semibold hover:brightness-105 transition-all"
+          >
+            Create New Scan
+            <ChevronRight className="w-4 h-4" />
+          </Link>
         </section>
       ) : (
         <>
@@ -420,7 +482,14 @@ export default function HistoryPage() {
                         {typeLabel(item.recordType)}
                       </span>
 
-                      <span className="text-xs text-slate-400 font-semibold">
+                      <span
+                        className={`text-xs font-bold ${
+                          item.confidenceValue !== null &&
+                          item.confidenceValue < 0.7
+                            ? "text-amber-600"
+                            : "text-emerald-600"
+                        }`}
+                      >
                         {item.confidenceLabel}
                       </span>
                     </div>
@@ -435,7 +504,7 @@ export default function HistoryPage() {
                     </div>
 
                     <p className="mt-3 text-sm text-slate-600 line-clamp-2 leading-relaxed">
-                      {item.translatedSummary}
+                      {historyPreview(item)}
                     </p>
                   </div>
                 </div>
@@ -472,72 +541,85 @@ export default function HistoryPage() {
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="rounded-[24px] bg-slate-50 px-5 py-5">
-                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500 mb-2">
-                        Dosage
-                      </p>
-                      <p className="text-slate-900 leading-relaxed">
-                        {selectedItem.dosage}
-                      </p>
-                    </div>
-
-                    <div className="rounded-[24px] bg-slate-50 px-5 py-5">
-                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500 mb-2">
-                        Barcode
-                      </p>
-                      <p className="text-slate-900 leading-relaxed">
-                        {selectedItem.barcode}
-                      </p>
-                    </div>
+                  <div className="rounded-[24px] bg-emerald-50 border border-emerald-100 px-5 py-5">
+                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-emerald-700 mb-2">
+                      Review note
+                    </p>
+                    <p className="text-emerald-900 leading-relaxed text-sm">
+                      {userFacingTrustNote(selectedItem)}
+                    </p>
                   </div>
+
+                  {selectedItem.recordType === "medicine" ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="rounded-[24px] bg-slate-50 px-5 py-5">
+                        <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500 mb-2">
+                          Dosage
+                        </p>
+                        <p className="text-slate-900 leading-relaxed">
+                          {selectedItem.dosage}
+                        </p>
+                      </div>
+
+                      <div className="rounded-[24px] bg-slate-50 px-5 py-5">
+                        <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500 mb-2">
+                          Barcode
+                        </p>
+                        <p className="text-slate-900 leading-relaxed">
+                          {selectedItem.barcode}
+                        </p>
+                      </div>
+                    </div>
+                  ) : null}
 
                   <div className="rounded-[24px] bg-slate-50 px-5 py-5">
                     <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500 mb-2">
-                      English explanation
+                      {explanationTitle(selectedItem)}
                     </p>
                     <p className="text-slate-900 leading-relaxed whitespace-pre-wrap">
                       {selectedItem.translatedSummary}
                     </p>
                   </div>
 
-                  <div className="rounded-[24px] bg-slate-50 px-5 py-5">
-                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500 mb-2">
-                      Original Chinese text
-                    </p>
-                    <p className="text-slate-700 leading-relaxed whitespace-pre-wrap text-sm">
+                  <details className="rounded-[24px] bg-slate-50 px-5 py-5">
+                    <summary className="cursor-pointer text-sm font-bold text-slate-900">
+                      Show original OCR text
+                    </summary>
+                    <p className="mt-4 text-slate-700 leading-relaxed whitespace-pre-wrap text-sm">
                       {selectedItem.extractedText}
                     </p>
-                  </div>
+                  </details>
 
-                  <div className="rounded-[24px] bg-slate-50 px-5 py-5">
-                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500 mb-2">
-                      Trust notes
-                    </p>
-                    <p className="text-slate-700 leading-relaxed text-sm">
+                  <details className="rounded-[24px] bg-slate-50 px-5 py-5">
+                    <summary className="cursor-pointer text-sm font-bold text-slate-900">
+                      Show technical trust details
+                    </summary>
+                    <p className="mt-4 text-slate-700 leading-relaxed text-sm whitespace-pre-wrap">
                       {selectedItem.trustNotes}
                     </p>
-                  </div>
+                  </details>
 
-                  <div className="rounded-[24px] bg-slate-50 px-5 py-5">
-                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500 mb-3">
-                      Warnings
-                    </p>
+                  {selectedItem.recordType === "medicine" ? (
+                    <div className="rounded-[24px] bg-slate-50 px-5 py-5">
+                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500 mb-3">
+                        Warnings
+                      </p>
 
-                    <div className="space-y-2">
-                      {(selectedItem.warnings.length > 0
-                        ? selectedItem.warnings
-                        : ["No warning text was returned by the backend."]
-                      ).map((warning) => (
-                        <div
-                          key={warning}
-                          className="rounded-[18px] bg-amber-50 border border-amber-100 px-4 py-3 text-sm text-amber-900"
-                        >
-                          {warning}
-                        </div>
-                      ))}
+                      <div className="space-y-2">
+                        {(selectedItem.warnings.length > 0
+                          ? selectedItem.warnings
+                          : ["No warning text was returned by the scan."]
+                        ).map((warning) => (
+                          <div
+                            key={warning}
+                            className="rounded-[18px] bg-amber-50 border border-amber-100 px-4 py-3 text-sm text-amber-900"
+                          >
+                            {warning}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  ) : null}
                 </div>
 
                 <div className="xl:w-[260px] shrink-0 space-y-3">
@@ -545,24 +627,35 @@ export default function HistoryPage() {
                     <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500 mb-2">
                       Confidence
                     </p>
-                    <p className="text-lg font-bold text-slate-900">
+                    <p
+                      className={`text-lg font-bold ${
+                        selectedItem.confidenceValue !== null &&
+                        selectedItem.confidenceValue < 0.7
+                          ? "text-amber-600"
+                          : "text-slate-900"
+                      }`}
+                    >
                       {selectedItem.confidenceLabel}
                     </p>
                   </div>
 
-                  <Link
-                    to="/reminders/create"
-                    state={{
-                      medicineId: "",
-                      medicineName: selectedItem.title,
-                      dosageNote: selectedItem.dosage,
-                      sourceScanId: selectedItem.id,
-                    }}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-brand-secondary px-5 py-3.5 text-white font-bold shadow-lg shadow-brand-secondary/20 hover:brightness-95 transition-all"
-                  >
-                    Create reminder
-                    <ChevronRight className="w-4 h-4" />
-                  </Link>
+                  {selectedItem.recordType === "medicine" ? (
+                    <Link
+                      to="/reminders/create"
+                      state={{
+                        medicineId: "",
+                        medicineName: selectedItem.title,
+                        dosageNote: buildEnglishReminderNote(
+                          selectedItem.dosage
+                        ),
+                        sourceScanId: selectedItem.id,
+                      }}
+                      className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-brand-secondary px-5 py-3.5 text-white font-bold shadow-lg shadow-brand-secondary/20 hover:brightness-95 transition-all"
+                    >
+                      Create reminder
+                      <ChevronRight className="w-4 h-4" />
+                    </Link>
+                  ) : null}
 
                   <button
                     type="button"

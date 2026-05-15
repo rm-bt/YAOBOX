@@ -26,20 +26,12 @@ export default function LoginPage() {
           </span>
         </Link>
 
-        <div className="flex items-center gap-6">
-          <button
-            type="button"
-            className="text-sm font-semibold text-on-surface-variant hover:text-on-surface transition-colors"
-          >
-            Language
-          </button>
-          <button
-            type="button"
-            className="hidden md:block text-sm font-semibold text-on-surface-variant hover:text-on-surface transition-colors"
-          >
-            Help Center
-          </button>
-        </div>
+        <Link
+          to="/register"
+          className="text-sm font-semibold text-on-surface-variant hover:text-on-surface transition-colors"
+        >
+          Create Account
+        </Link>
       </nav>
 
       <div className="flex-grow flex flex-col lg:flex-row">
@@ -182,12 +174,9 @@ export default function LoginPage() {
                       >
                         Password
                       </label>
-                      <button
-                        type="button"
-                        className="text-xs font-bold text-yaobox-primary hover:text-on-surface transition-colors"
-                      >
-                        Forgot?
-                      </button>
+                      <span className="text-xs font-bold text-outline">
+                        Password reset unavailable
+                      </span>
                     </div>
 
                     <div className="relative group">
@@ -241,13 +230,13 @@ export default function LoginPage() {
 
             <div className="mt-8 text-center">
               <p className="text-sm font-medium text-on-surface-variant">
-                Need an account later?
-                <button
-                  type="button"
+                Need an account?
+                <Link
+                  to="/register"
                   className="font-bold text-yaobox-primary hover:underline ml-1"
                 >
-                  Register design comes next
-                </button>
+                  Create one
+                </Link>
               </p>
             </div>
           </motion.main>

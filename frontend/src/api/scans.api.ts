@@ -37,6 +37,23 @@ export async function uploadPrescriptionScan(file: File): Promise<ScanResponse> 
   return response.data;
 }
 
+export async function uploadReportScan(file: File): Promise<ScanResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await apiClient.post<ScanResponse>(
+    "/scans/upload-report",
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }
+  );
+
+  return response.data;
+}
+
 export async function createManualScan(
   payload: CreateManualScanRequest
 ): Promise<ScanResponse> {

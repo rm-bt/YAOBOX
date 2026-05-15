@@ -1,354 +1,152 @@
-import { env } from "../../../app/config/env";
 import type { ScanResponse } from "../../../api/types/scan.types";
 
-type RawRecord = Record<string, unknown>;
-
 export type NormalizedScanResult = {
-  scanId: string;
-  medicineId: string;
-  sourceType: string;
-  sourceLabel: string;
-  confidence: number | null;
-  confidenceLabel: string | null;
+  id: number;
+  scanId: number;
+
+  medicineId: number | null;
+
   medicineName: string;
   medicineNameZh: string;
+
+  imagePath: string | null;
+  imagePreview: string | null;
+
+  barcode: string | null;
+
+  sourceType: string;
+  sourceLabel: string;
+
   matchStatus: string;
+
   ocrStatus: string;
   aiStatus: string;
-  trustNotes: string;
-  barcode: string;
-  dosage: string;
-  usage: string;
+
+  confidence: number | null;
+  confidenceLabel: string | null;
+
   manufacturer: string;
-  translatedSummary: string;
-  extractedText: string;
+  ingredients: string;
+
+  usage: string;
+  dosage: string;
+
+  warning: string;
   warnings: string[];
-  imagePreview: string | null;
-  createdAtLabel: string;
+
+  translatedText: string;
+  translatedSummary: string;
+
+  rawOcrText: string;
+  extractedText: string;
+
+  trustNotes: string;
+
+  createdAt: string;
 };
 
-function firstNonEmptyString(...values: unknown[]): string {
-  for (const value of values) {
-    if (typeof value === "string" && value.trim()) {
-      return value.trim();
-    }
+function text(value: string | null | undefined, fallback: string): string {
+  const cleaned = value?.trim();
+  return cleaned && cleaned.length > 0 ? cleaned : fallback;
+}
+
+function confidenceLabel(value: number | null): string | null {
+  if (value === null || Number.isNaN(value)) {
+    return null;
   }
 
-  return "";
+  return `${Math.round(value * 100)}%`;
 }
 
-function humanizeSourceType(value: string): string {
-  const normalized = value.trim().toLowerCase();
+function sourceLabel(sourceType: string): string {
+  switch (sourceType) {
+    case "image_upload":
+      return "Image Upload";
 
-  if (normalized === "barcode") return "Barcode";
-  if (normalized === "image_upload") return "Image Upload";
-  if (normalized === "prescription_upload") return "Prescription Upload";
-  if (normalized === "manual_entry") return "Manual Entry";
-  if (normalized === "prescription") return "Prescription";
-  if (normalized === "report") return "Report";
+    case "barcode":
+      return "Barcode Prototype";
 
-  return value.replace(/_/g, " ") || "Scan";
-}
+    case "prescription_upload":
+      return "Prescription Upload";
 
-function humanizeMatchStatus(value: string): string {
-  const normalized = value.trim().toLowerCase();
-
-  if (!normalized || normalized === "unknown") return "Unknown";
-  if (normalized === "identified") return "Identified";
-  if (normalized === "verified") return "Verified catalog";
-  if (normalized === "catalog_unverified") return "Catalog match, unverified";
-  if (normalized === "probable") return "Probable";
-  if (normalized === "saved") return "Saved";
-  if (normalized === "ocr_extracted") return "OCR extracted";
-  if (normalized === "barcode_unknown") return "Barcode not matched";
-  if (normalized === "manual") return "Manual entry";
-
-  return value.replace(/_/g, " ");
-}
-
-function humanizeStatus(value: string): string {
-  const normalized = value.trim().toLowerCase();
-
-  if (!normalized) return "Not available";
-  if (normalized === "succeeded") return "Succeeded";
-  if (normalized === "partial") return "Partial";
-  if (normalized === "empty") return "No text found";
-  if (normalized === "failed") return "Failed";
-  if (normalized === "fallback") return "Fallback";
-  if (normalized === "skipped") return "Skipped";
-  if (normalized === "not_applicable") return "Not applicable";
-  if (normalized === "not_used_catalog_match") return "Catalog data used";
-
-  return value.replace(/_/g, " ");
-}
-
-function containsChinese(text: string): boolean {
-  return /[\u3400-\u9fff]/.test(text);
-}
-
-function extractChinesePreview(rawText: string): string {
-  if (!rawText) return "";
-
-  const lines = rawText
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  return lines.find(containsChinese) ?? "";
-}
-
-function formatDateLabel(value: unknown): string {
-  if (typeof value !== "string" || !value) return "Recently";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Recently";
-
-  return new Intl.DateTimeFormat("en", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
-}
-
-function buildImageUrl(
-  raw: RawRecord,
-  localPreviewUrl?: string | null
-): string | null {
-  if (localPreviewUrl) return localPreviewUrl;
-
-  const direct = firstNonEmptyString(
-    raw.image_url,
-    raw.imageUrl,
-    raw.imagePreview
-  );
-
-  if (direct) {
-    if (direct.startsWith("http://") || direct.startsWith("https://")) {
-      return direct;
-    }
-
-    if (direct.startsWith("/")) {
-      return `${env.apiBaseUrl}${direct}`;
-    }
-
-    return `${env.apiBaseUrl}/${direct}`;
+    default:
+      return sourceType;
   }
-
-  const imagePath = firstNonEmptyString(raw.image_path, raw.imagePath);
-  if (!imagePath || imagePath === "null") return null;
-
-  const normalized = imagePath.replace(/\\/g, "/");
-
-  if (normalized.startsWith("http://") || normalized.startsWith("https://")) {
-    return normalized;
-  }
-
-  if (normalized.startsWith("/")) {
-    return `${env.apiBaseUrl}${normalized}`;
-  }
-
-  return `${env.apiBaseUrl}/${normalized}`;
-}
-
-function normalizeConfidence(
-  raw: RawRecord,
-  sourceType: string
-): { confidence: number | null; confidenceLabel: string | null } {
-  const confidence = raw.confidence;
-
-  if (typeof confidence === "number") {
-    return {
-      confidence,
-      confidenceLabel: `${Math.round(confidence * 100)}% confidence`,
-    };
-  }
-
-  if (confidence && typeof confidence === "object") {
-    const confidenceObject = confidence as RawRecord;
-
-    if (typeof confidenceObject.ocr === "number") {
-      return {
-        confidence: confidenceObject.ocr,
-        confidenceLabel: `${Math.round(confidenceObject.ocr * 100)}% OCR`,
-      };
-    }
-  }
-
-  if (typeof raw.ocr_confidence === "number") {
-    return {
-      confidence: raw.ocr_confidence,
-      confidenceLabel: `${Math.round(raw.ocr_confidence * 100)}% OCR`,
-    };
-  }
-
-  if (sourceType === "barcode") {
-    return {
-      confidence: null,
-      confidenceLabel: "Barcode lookup",
-    };
-  }
-
-  return {
-    confidence: null,
-    confidenceLabel: null,
-  };
-}
-
-function splitWarnings(...values: unknown[]): string[] {
-  const warnings: string[] = [];
-
-  for (const value of values) {
-    if (Array.isArray(value)) {
-      value.forEach((item) => {
-        if (typeof item === "string" && item.trim()) {
-          warnings.push(item.trim());
-        }
-      });
-
-      continue;
-    }
-
-    const text = firstNonEmptyString(value);
-
-    if (text) {
-      text
-        .split(/\n|;|；|。/)
-        .map((item) => item.trim())
-        .filter(Boolean)
-        .forEach((item) => warnings.push(item));
-    }
-  }
-
-  return Array.from(new Set(warnings));
-}
-
-function barcodeFallback(raw: RawRecord, medicine: RawRecord): string {
-  const barcode = firstNonEmptyString(raw.barcode, raw.bar_code, medicine.barcode);
-  return barcode ? `Barcode ${barcode}` : "";
 }
 
 export function mapScanResponse(
-  input: ScanResponse | unknown,
-  localPreviewUrl?: string | null,
-  fallbackSourceType: "image_upload" | "barcode" | "prescription_upload" =
-    "image_upload"
+  raw: ScanResponse,
+  previewUrl?: string | null,
+  fallbackSource?: string
 ): NormalizedScanResult {
-  const raw = ((input ?? {}) as RawRecord) || {};
-  const medicine = ((raw.medicine as RawRecord | undefined) ?? {}) as RawRecord;
+  const source = raw.source_type ?? fallbackSource ?? "unknown";
 
-  const sourceType =
-    firstNonEmptyString(raw.sourceType, raw.source_type) || fallbackSourceType;
-
-  const confidence = normalizeConfidence(raw, sourceType);
-
-  const extractedText =
-    firstNonEmptyString(
-      raw.extractedText,
-      raw.extractedTextZh,
-      raw.extracted_text_zh,
-      raw.raw_text,
-      raw.raw_ocr_text,
-      raw.ocr_text,
-      raw.original_text
-    ) || "Original extracted text was not returned.";
-
-  const chinesePreview = extractChinesePreview(extractedText);
-
-  const warnings = splitWarnings(
+  const warningText = text(
     raw.warnings,
-    raw.warning,
-    raw.precautions,
-    medicine.warnings,
-    medicine.warning
+    "No warning text was returned by the backend."
   );
 
   return {
-    scanId: String(raw.scanId ?? raw.scan_id ?? raw.id ?? "unknown"),
-    medicineId: String(raw.medicine_id ?? raw.medicineId ?? medicine.id ?? ""),
-    sourceType,
-    sourceLabel: humanizeSourceType(sourceType),
-    confidence: confidence.confidence,
-    confidenceLabel: confidence.confidenceLabel,
-    medicineName:
-      firstNonEmptyString(
-        raw.medicineName,
-        raw.medicine_name,
-        medicine.nameEn,
-        medicine.name_en,
-        raw.name,
-        raw.title,
-        barcodeFallback(raw, medicine),
-        chinesePreview
-      ) || "Medicine result",
-    medicineNameZh:
-      firstNonEmptyString(
-        raw.medicineNameZh,
-        raw.name_zh,
-        medicine.canonicalNameZh,
-        medicine.canonical_name_zh,
-        medicine.nameZh,
-        medicine.name_zh,
-        chinesePreview
-      ) ||
-      (sourceType === "barcode"
-        ? "Barcode-based lookup result"
-        : "Chinese text available below"),
-    matchStatus: humanizeMatchStatus(
-      firstNonEmptyString(
-        raw.matchStatus,
-        raw.match_status,
-        medicine.matchStatus,
-        raw.status
-      ) || "unknown"
+    id: raw.id,
+    scanId: raw.id,
+
+    medicineId: raw.medicine_id ?? null,
+
+    medicineName: text(raw.medicine_name, "Unknown medicine"),
+    medicineNameZh: text(raw.medicine_name, "Unknown medicine"),
+
+    imagePath: raw.image_path ?? null,
+    imagePreview: previewUrl ?? raw.image_path ?? null,
+
+    barcode: raw.barcode ?? null,
+
+    sourceType: source,
+    sourceLabel: sourceLabel(source),
+
+    matchStatus: text(raw.match_status, "unknown"),
+
+    ocrStatus: text(raw.ocr_status, "unknown"),
+    aiStatus: text(raw.ai_status, "unknown"),
+
+    confidence: raw.ocr_confidence ?? null,
+    confidenceLabel: confidenceLabel(raw.ocr_confidence ?? null),
+
+    manufacturer: text(raw.manufacturer, "Manufacturer not available."),
+
+    ingredients: text(raw.ingredients, "Ingredients not available."),
+
+    usage: text(raw.usage, "Usage information not available."),
+
+    dosage: text(raw.dosage, "Dosage information not available."),
+
+    warning: warningText,
+    warnings: [warningText],
+
+    translatedText: text(
+      raw.translated_text,
+      "No AI explanation available."
     ),
-    ocrStatus: humanizeStatus(
-      firstNonEmptyString(raw.ocrStatus, raw.ocr_status) ||
-        (sourceType === "barcode" ? "not_applicable" : "not available")
+
+    translatedSummary: text(
+      raw.translated_text,
+      "No AI explanation available."
     ),
-    aiStatus: humanizeStatus(
-      firstNonEmptyString(raw.aiStatus, raw.ai_status) || "not available"
+
+    rawOcrText: text(
+      raw.raw_ocr_text,
+      "No OCR text available."
     ),
-    trustNotes:
-      firstNonEmptyString(raw.trustNotes, raw.trust_notes) ||
-      "Trust metadata was not returned by the backend for this result.",
-    barcode:
-      firstNonEmptyString(raw.barcode, raw.bar_code, medicine.barcode) ||
-      "Not available",
-    dosage:
-      firstNonEmptyString(
-        raw.dosage,
-        raw.dosage_instructions,
-        medicine.dosage_text,
-        medicine.dosageText,
-        medicine.dosage
-      ) || "Dosage not extracted clearly",
-    usage:
-      firstNonEmptyString(
-        raw.usage,
-        raw.instructions,
-        raw.usage_guidelines,
-        medicine.usage,
-        medicine.instructions
-      ) || "Usage details were not returned by the backend.",
-    manufacturer:
-      firstNonEmptyString(raw.manufacturer, medicine.manufacturer) ||
-      "Manufacturer not available",
-    translatedSummary:
-      firstNonEmptyString(
-        raw.translatedSummary,
-        raw.translatedSummaryEn,
-        raw.translated_summary_en,
-        raw.translated_text,
-        raw.summary,
-        raw.explanation
-      ) || "English explanation was not returned by the backend.",
-    extractedText,
-    warnings:
-      warnings.length > 0
-        ? warnings
-        : ["No warning text was returned by the backend."],
-    imagePreview: buildImageUrl(raw, localPreviewUrl),
-    createdAtLabel: formatDateLabel(raw.created_at ?? raw.createdAt),
+
+    extractedText: text(
+      raw.raw_ocr_text,
+      "No OCR text available."
+    ),
+
+    trustNotes: text(
+      raw.trust_notes,
+      "No trust notes available."
+    ),
+
+    createdAt: raw.created_at,
   };
 }

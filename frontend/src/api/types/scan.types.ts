@@ -8,6 +8,7 @@ export type ScanResponse = {
   raw_ocr_text?: string | null;
   translated_text?: string | null;
   manufacturer?: string | null;
+  ingredients?: string | null;
   usage?: string | null;
   dosage?: string | null;
   warnings?: string | null;
@@ -28,6 +29,7 @@ export type CreateManualScanRequest = {
   translated_text?: string | null;
   barcode?: string | null;
   manufacturer?: string | null;
+  ingredients?: string | null;
   usage?: string | null;
   dosage?: string | null;
   warnings?: string | null;

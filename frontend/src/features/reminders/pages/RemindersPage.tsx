@@ -24,13 +24,17 @@ import {
   type ReminderItem,
 } from "../../../api/reminders.api";
 
+type ReminderFrequency = "once" | "daily" | "twice_daily" | "weekly";
+
 type NormalizedReminder = {
   id: string;
   title: string;
   medicineId: string;
   reminderTimeRaw: string;
   reminderTimeText: string;
+  reminderDateText: string;
   frequency: string;
+  frequencyLabel: string;
   dosageNote: string;
   isActive: boolean;
 };
@@ -38,11 +42,24 @@ type NormalizedReminder = {
 type ReminderFormState = {
   medicineId: string;
   medicineName: string;
-  reminderTime: string;
-  frequency: string;
+  frequency: ReminderFrequency;
+  onceDate: string;
+  primaryTime: string;
+  secondaryTime: string;
+  weeklyDay: string;
   dosageNote: string;
   isActive: boolean;
 };
+
+const WEEKDAYS = [
+  { value: "0", label: "Sunday" },
+  { value: "1", label: "Monday" },
+  { value: "2", label: "Tuesday" },
+  { value: "3", label: "Wednesday" },
+  { value: "4", label: "Thursday" },
+  { value: "5", label: "Friday" },
+  { value: "6", label: "Saturday" },
+];
 
 function firstNonEmptyString(...values: unknown[]): string {
   for (const value of values) {
@@ -52,14 +69,72 @@ function firstNonEmptyString(...values: unknown[]): string {
   return "";
 }
 
-function toReminderIsoDateTime(value: string): string {
-  const date = new Date(value);
+function pad(value: number): string {
+  return String(value).padStart(2, "0");
+}
 
-  if (Number.isNaN(date.getTime())) {
-    return value;
+function todayInputDate(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+function localDateTimeToIso(dateValue: string, timeValue: string): string {
+  const [year, month, day] = dateValue.split("-").map(Number);
+  const [hour, minute] = timeValue.split(":").map(Number);
+
+  const date = new Date(year, month - 1, day, hour, minute, 0, 0);
+  return date.toISOString();
+}
+
+function nextDateForTime(timeValue: string): string {
+  const now = new Date();
+  const [hour, minute] = timeValue.split(":").map(Number);
+
+  const candidate = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    hour,
+    minute,
+    0,
+    0
+  );
+
+  if (candidate.getTime() <= now.getTime()) {
+    candidate.setDate(candidate.getDate() + 1);
   }
 
-  return date.toISOString();
+  return candidate.toISOString();
+}
+
+function nextDateForWeekday(dayValue: string, timeValue: string): string {
+  const now = new Date();
+  const targetDay = Number(dayValue);
+  const [hour, minute] = timeValue.split(":").map(Number);
+
+  const candidate = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    hour,
+    minute,
+    0,
+    0
+  );
+
+  const currentDay = candidate.getDay();
+  let daysToAdd = targetDay - currentDay;
+
+  if (daysToAdd < 0) {
+    daysToAdd += 7;
+  }
+
+  if (daysToAdd === 0 && candidate.getTime() <= now.getTime()) {
+    daysToAdd = 7;
+  }
+
+  candidate.setDate(candidate.getDate() + daysToAdd);
+  return candidate.toISOString();
 }
 
 function formatTimeLabel(value: unknown): string {
@@ -78,6 +153,19 @@ function formatTimeLabel(value: unknown): string {
   return value;
 }
 
+function formatDateLabel(value: unknown): string {
+  if (typeof value !== "string" || !value) return "Date not set";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Date not set";
+
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
 function isDueToday(value: string): boolean {
   if (!value) return false;
 
@@ -93,6 +181,25 @@ function isDueToday(value: string): boolean {
   );
 }
 
+function humanizeFrequency(value: string): string {
+  const normalized = value.trim().toLowerCase();
+
+  if (normalized === "once") return "One time";
+  if (normalized === "daily") return "Daily";
+  if (normalized === "twice_daily") return "Twice daily";
+  if (normalized === "twice_daily_first") return "Twice daily - first dose";
+  if (normalized === "twice_daily_second") return "Twice daily - second dose";
+
+  if (normalized.startsWith("weekly_")) {
+    const day = normalized.replace("weekly_", "");
+    return `Weekly - ${day.charAt(0).toUpperCase()}${day.slice(1)}`;
+  }
+
+  if (normalized === "weekly") return "Weekly";
+
+  return value.replace(/_/g, " ");
+}
+
 function normalizeReminder(raw: ReminderItem): NormalizedReminder {
   const reminderTimeRaw = firstNonEmptyString(raw.reminder_time);
 
@@ -101,22 +208,24 @@ function normalizeReminder(raw: ReminderItem): NormalizedReminder {
       ? String(raw.medicine_id)
       : firstNonEmptyString(raw.medicine_id);
 
+  const frequency = firstNonEmptyString(raw.frequency) || "daily";
+
   return {
     id: String(raw.id),
     title: firstNonEmptyString(raw.medicine_name) || "Medication reminder",
     medicineId,
     reminderTimeRaw,
     reminderTimeText: formatTimeLabel(reminderTimeRaw),
-    frequency: firstNonEmptyString(raw.frequency) || "daily",
+    reminderDateText: formatDateLabel(reminderTimeRaw),
+    frequency,
+    frequencyLabel: humanizeFrequency(frequency),
     dosageNote: firstNonEmptyString(raw.dosage_note) || "No dosage note",
     isActive: Boolean(raw.is_active ?? true),
   };
 }
 
-function buildCreatePayload(form: ReminderFormState): ReminderCreatePayload {
-  const payload: ReminderCreatePayload = {
-    reminder_time: toReminderIsoDateTime(form.reminderTime),
-    frequency: form.frequency,
+function basePayload(form: ReminderFormState): Omit<ReminderCreatePayload, "reminder_time" | "frequency"> {
+  const payload: Omit<ReminderCreatePayload, "reminder_time" | "frequency"> = {
     dosage_note: form.dosageNote.trim() || null,
     is_active: form.isActive,
   };
@@ -133,6 +242,92 @@ function buildCreatePayload(form: ReminderFormState): ReminderCreatePayload {
   }
 
   return payload;
+}
+
+function buildCreatePayloads(form: ReminderFormState): ReminderCreatePayload[] {
+  const shared = basePayload(form);
+
+  if (form.frequency === "once") {
+    return [
+      {
+        ...shared,
+        reminder_time: localDateTimeToIso(form.onceDate, form.primaryTime),
+        frequency: "once",
+      },
+    ];
+  }
+
+  if (form.frequency === "daily") {
+    return [
+      {
+        ...shared,
+        reminder_time: nextDateForTime(form.primaryTime),
+        frequency: "daily",
+      },
+    ];
+  }
+
+  if (form.frequency === "twice_daily") {
+    return [
+      {
+        ...shared,
+        reminder_time: nextDateForTime(form.primaryTime),
+        frequency: "twice_daily_first",
+        dosage_note:
+          form.dosageNote.trim() ||
+          "First daily reminder. Follow the medicine label or doctor/pharmacist instructions.",
+      },
+      {
+        ...shared,
+        reminder_time: nextDateForTime(form.secondaryTime),
+        frequency: "twice_daily_second",
+        dosage_note:
+          form.dosageNote.trim() ||
+          "Second daily reminder. Follow the medicine label or doctor/pharmacist instructions.",
+      },
+    ];
+  }
+
+  const selectedDay =
+    WEEKDAYS.find((item) => item.value === form.weeklyDay)?.label.toLowerCase() ??
+    "weekly";
+
+  return [
+    {
+      ...shared,
+      reminder_time: nextDateForWeekday(form.weeklyDay, form.primaryTime),
+      frequency: `weekly_${selectedDay}`,
+    },
+  ];
+}
+
+function validateForm(form: ReminderFormState): string {
+  if (!form.medicineName.trim()) {
+    return "Medicine name is required.";
+  }
+
+  if (form.frequency === "once" && !form.onceDate) {
+    return "Choose a date for the one-time reminder.";
+  }
+
+  if (!form.primaryTime) {
+    return "Choose a reminder time.";
+  }
+
+  if (form.frequency === "twice_daily" && !form.secondaryTime) {
+    return "Choose the second reminder time.";
+  }
+
+  if (
+    form.frequency === "twice_daily" &&
+    form.primaryTime &&
+    form.secondaryTime &&
+    form.primaryTime === form.secondaryTime
+  ) {
+    return "The two reminder times must be different.";
+  }
+
+  return "";
 }
 
 const StatCard = ({
@@ -170,12 +365,16 @@ export default function RemindersPage() {
   const [form, setForm] = useState<ReminderFormState>({
     medicineId: "",
     medicineName: "",
-    reminderTime: "",
     frequency: "daily",
+    onceDate: todayInputDate(),
+    primaryTime: "",
+    secondaryTime: "",
+    weeklyDay: String(new Date().getDay()),
     dosageNote: "",
     isActive: true,
   });
 
+  const [formError, setFormError] = useState("");
   const [activeMutationId, setActiveMutationId] = useState<string | null>(null);
 
   const remindersQuery = useQuery({
@@ -187,7 +386,15 @@ export default function RemindersPage() {
   });
 
   const createReminderMutation = useMutation({
-    mutationFn: createReminder,
+    mutationFn: async (payloads: ReminderCreatePayload[]) => {
+      const created = [];
+
+      for (const payload of payloads) {
+        created.push(await createReminder(payload));
+      }
+
+      return created;
+    },
     onMutate: () => {
       setActiveMutationId("create");
     },
@@ -196,11 +403,15 @@ export default function RemindersPage() {
       setForm({
         medicineId: "",
         medicineName: "",
-        reminderTime: "",
         frequency: "daily",
+        onceDate: todayInputDate(),
+        primaryTime: "",
+        secondaryTime: "",
+        weeklyDay: String(new Date().getDay()),
         dosageNote: "",
         isActive: true,
       });
+      setFormError("");
     },
     onSettled: () => {
       setActiveMutationId(null);
@@ -271,10 +482,23 @@ export default function RemindersPage() {
     updateReminderMutation.isPending ||
     deleteReminderMutation.isPending;
 
+  function handleFrequencyChange(nextFrequency: ReminderFrequency) {
+    setForm((current) => ({
+      ...current,
+      frequency: nextFrequency,
+      onceDate: current.onceDate || todayInputDate(),
+      secondaryTime:
+        nextFrequency === "twice_daily" ? current.secondaryTime : "",
+    }));
+    setFormError("");
+  }
+
   function handleCreateSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!form.reminderTime) {
+    const validationError = validateForm(form);
+    if (validationError) {
+      setFormError(validationError);
       return;
     }
 
@@ -282,7 +506,7 @@ export default function RemindersPage() {
     updateReminderMutation.reset();
     deleteReminderMutation.reset();
 
-    createReminderMutation.mutate(buildCreatePayload(form));
+    createReminderMutation.mutate(buildCreatePayloads(form));
   }
 
   function handleToggleActive(item: NormalizedReminder) {
@@ -322,6 +546,19 @@ export default function RemindersPage() {
     deleteReminderMutation.mutate(itemId);
   }
 
+  const nextVisibleReminder = activeReminders
+    .slice()
+    .sort((a, b) => {
+      const aTime = new Date(a.reminderTimeRaw).getTime();
+      const bTime = new Date(b.reminderTimeRaw).getTime();
+
+      if (Number.isNaN(aTime) && Number.isNaN(bTime)) return 0;
+      if (Number.isNaN(aTime)) return 1;
+      if (Number.isNaN(bTime)) return -1;
+
+      return aTime - bTime;
+    })[0];
+
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-6">
       <header className="space-y-4">
@@ -334,8 +571,9 @@ export default function RemindersPage() {
         </h1>
 
         <p className="text-lg text-slate-600 max-w-3xl leading-relaxed">
-          Keep reminder setup simple. Create, review, activate, and remove schedules
-          without turning reminders into a fake clinical system.
+          Create practical reminder schedules. Daily uses a time only, twice
+          daily creates two reminder records, weekly uses weekday plus time, and
+          one-time reminders use a specific date and time.
         </p>
 
         <div className="inline-flex items-center gap-2 rounded-full bg-brand-primary-container/40 px-4 py-2 text-sm font-semibold text-brand-on-primary-container">
@@ -399,7 +637,7 @@ export default function RemindersPage() {
           value={
             remindersQuery.isLoading
               ? "..."
-              : activeReminders[0]?.reminderTimeText ?? "--"
+              : nextVisibleReminder?.reminderTimeText ?? "--"
           }
           label="Next visible time"
           colorClass="bg-slate-100 text-slate-700"
@@ -417,7 +655,7 @@ export default function RemindersPage() {
                 Create reminder
               </h2>
               <p className="text-sm text-slate-500">
-                Saved through the shared backend reminder API.
+                Frequency now changes the fields you must fill.
               </p>
             </div>
           </div>
@@ -461,42 +699,174 @@ export default function RemindersPage() {
 
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-800">
-                Reminder time
-              </label>
-              <input
-                type="datetime-local"
-                value={form.reminderTime}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    reminderTime: event.target.value,
-                  }))
-                }
-                required
-                className="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-800">
                 Frequency
               </label>
               <select
                 value={form.frequency}
                 onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    frequency: event.target.value,
-                  }))
+                  handleFrequencyChange(event.target.value as ReminderFrequency)
                 }
                 className="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10"
               >
+                <option value="once">One time</option>
                 <option value="daily">Daily</option>
                 <option value="twice_daily">Twice daily</option>
                 <option value="weekly">Weekly</option>
-                <option value="custom">Custom</option>
               </select>
             </div>
+
+            {form.frequency === "once" ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-800">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    value={form.onceDate}
+                    min={todayInputDate()}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        onceDate: event.target.value,
+                      }))
+                    }
+                    className="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-800">
+                    Time
+                  </label>
+                  <input
+                    type="time"
+                    value={form.primaryTime}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        primaryTime: event.target.value,
+                      }))
+                    }
+                    className="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10"
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            {form.frequency === "daily" ? (
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-800">
+                  Daily time
+                </label>
+                <input
+                  type="time"
+                  value={form.primaryTime}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      primaryTime: event.target.value,
+                    }))
+                  }
+                  className="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10"
+                />
+                <p className="text-xs text-slate-500">
+                  The first reminder will be scheduled for the next occurrence of
+                  this time.
+                </p>
+              </div>
+            ) : null}
+
+            {form.frequency === "twice_daily" ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-800">
+                    First daily time
+                  </label>
+                  <input
+                    type="time"
+                    value={form.primaryTime}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        primaryTime: event.target.value,
+                      }))
+                    }
+                    className="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-800">
+                    Second daily time
+                  </label>
+                  <input
+                    type="time"
+                    value={form.secondaryTime}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        secondaryTime: event.target.value,
+                      }))
+                    }
+                    className="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10"
+                  />
+                </div>
+
+                <p className="sm:col-span-2 text-xs text-slate-500">
+                  This creates two reminder records so the current backend can
+                  notify twice per day without pretending it has a recurrence engine.
+                </p>
+              </div>
+            ) : null}
+
+            {form.frequency === "weekly" ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-800">
+                    Weekday
+                  </label>
+                  <select
+                    value={form.weeklyDay}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        weeklyDay: event.target.value,
+                      }))
+                    }
+                    className="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10"
+                  >
+                    {WEEKDAYS.map((day) => (
+                      <option key={day.value} value={day.value}>
+                        {day.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-800">
+                    Time
+                  </label>
+                  <input
+                    type="time"
+                    value={form.primaryTime}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        primaryTime: event.target.value,
+                      }))
+                    }
+                    className="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-900 outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10"
+                  />
+                </div>
+
+                <p className="sm:col-span-2 text-xs text-slate-500">
+                  The first reminder will be scheduled for the next selected
+                  weekday and time.
+                </p>
+              </div>
+            ) : null}
 
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-800">
@@ -533,6 +903,12 @@ export default function RemindersPage() {
               </span>
             </label>
 
+            {formError ? (
+              <div className="rounded-[20px] bg-amber-50 border border-amber-100 px-4 py-4 text-sm text-amber-800 leading-relaxed">
+                {formError}
+              </div>
+            ) : null}
+
             {createReminderMutation.isError ? (
               <div className="rounded-[20px] bg-red-50 border border-red-100 px-4 py-4 text-sm text-red-700 leading-relaxed whitespace-pre-wrap break-words">
                 {createReminderMutation.error instanceof Error
@@ -544,7 +920,9 @@ export default function RemindersPage() {
             {createReminderMutation.isSuccess ? (
               <div className="rounded-[20px] bg-emerald-50 border border-emerald-100 px-4 py-4 text-sm text-emerald-700 leading-relaxed flex items-start gap-2">
                 <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
-                <span>Reminder created successfully.</span>
+                <span>
+                  Reminder created successfully. Twice daily creates two reminders.
+                </span>
               </div>
             ) : null}
 
@@ -555,7 +933,9 @@ export default function RemindersPage() {
             >
               {createReminderMutation.isPending
                 ? "Creating reminder..."
-                : "Create reminder"}
+                : form.frequency === "twice_daily"
+                  ? "Create two reminders"
+                  : "Create reminder"}
             </button>
           </form>
         </div>
@@ -568,7 +948,7 @@ export default function RemindersPage() {
                   Active reminders
                 </h2>
                 <p className="text-sm text-slate-500">
-                  Simple schedule display, honest status, clean controls.
+                  Concrete scheduled reminder records.
                 </p>
               </div>
 
@@ -614,7 +994,7 @@ export default function RemindersPage() {
                               {item.title}
                             </p>
                             <span className="rounded-full bg-brand-primary-container/40 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-brand-on-primary-container">
-                              {item.frequency}
+                              {item.frequencyLabel}
                             </span>
                           </div>
 
@@ -626,6 +1006,11 @@ export default function RemindersPage() {
                             <span className="inline-flex items-center gap-1">
                               <Clock3 size={14} />
                               {item.reminderTimeText}
+                            </span>
+
+                            <span className="inline-flex items-center gap-1">
+                              <CalendarDays size={14} />
+                              {item.reminderDateText}
                             </span>
 
                             {item.medicineId ? (
@@ -709,6 +1094,10 @@ export default function RemindersPage() {
                           <p className="text-sm text-slate-600 mt-1">
                             {item.dosageNote}
                           </p>
+                          <p className="text-xs text-slate-500 mt-2">
+                            {item.frequencyLabel} · {item.reminderDateText} ·{" "}
+                            {item.reminderTimeText}
+                          </p>
                         </div>
 
                         <button
@@ -742,10 +1131,9 @@ export default function RemindersPage() {
       </section>
 
       <div className="text-xs text-slate-500 leading-relaxed max-w-3xl">
-        This page is wired through the shared reminder API wrapper:
-        <code> GET /reminders/</code>, <code>POST /reminders/</code>,
-        <code> PUT /reminders/{"{id}"}</code>, and
-        <code> DELETE /reminders/{"{id}"}</code>.
+        Current MVP storage model: each backend reminder row stores one concrete
+        reminder datetime and one frequency label. Twice daily is represented by
+        two reminder rows.
       </div>
     </div>
   );

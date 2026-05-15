@@ -20,15 +20,23 @@ import {
   Maximize2,
   Pill,
   ScanLine,
+  ShieldCheck,
   Smartphone,
   Upload,
 } from "lucide-react";
-import { useUploadMedicineScan } from "../hooks/useUploadMedicineScan";
+
+import {
+  useUploadMedicineScan,
+  useUploadPrescriptionScan,
+  useUploadReportScan,
+} from "../hooks/useUploadMedicineScan";
 import { useScanBarcode } from "../hooks/useCreateManualScan";
 import {
   mapScanResponse,
   type NormalizedScanResult,
 } from "../utils/mapScanResponse";
+
+type ScanMode = "image" | "barcode" | "prescription" | "report";
 
 const dottedBorderStyle: CSSProperties = {
   backgroundImage:
@@ -37,9 +45,10 @@ const dottedBorderStyle: CSSProperties = {
 };
 
 const PROCESS_STEPS = [
-  "Uploading image to the backend",
+  "Uploading file to the backend",
   "Running OCR extraction",
-  "Generating explanation and structured output",
+  "Preparing translation and review output",
+  "Saving scan record",
 ] as const;
 
 const TipCard = ({
@@ -62,14 +71,134 @@ const TipCard = ({
   </div>
 );
 
+function isVerifiedCatalogResult(result: NormalizedScanResult): boolean {
+  return result.matchStatus.toLowerCase().includes("verified");
+}
+
+function isDocumentResult(result: NormalizedScanResult): boolean {
+  return (
+    result.sourceType === "prescription_upload" ||
+    result.sourceType === "report_upload"
+  );
+}
+
+function shouldShowChineseSubtitle(result: NormalizedScanResult): boolean {
+  if (!result.medicineNameZh) return false;
+
+  const normalized = result.medicineNameZh.trim().toLowerCase();
+
+  if (
+    normalized.includes("barcode-based lookup") ||
+    normalized.includes("chinese text available")
+  ) {
+    return false;
+  }
+
+  if (isVerifiedCatalogResult(result)) {
+    return false;
+  }
+
+  return normalized !== result.medicineName.trim().toLowerCase();
+}
+
+function buildResultSubtitle(result: NormalizedScanResult): string {
+  if (isVerifiedCatalogResult(result)) {
+    return "Verified catalogue match. Medicine details are shown separately from OCR evidence.";
+  }
+
+  if (result.sourceType === "barcode") {
+    return "Barcode lookup prototype result. This depends on barcode records existing in the local catalogue.";
+  }
+
+  if (result.sourceType === "prescription_upload") {
+    return "Prescription OCR result. The system translates visible text only and does not diagnose.";
+  }
+
+  if (result.sourceType === "report_upload") {
+    return "Medical report OCR result. The system translates visible text only and does not diagnose.";
+  }
+
+  return "OCR extracted result. Review the original text and confidence details carefully.";
+}
+
+function formatExplanation(value: string): string {
+  return value
+    .replace(/\s+(English Translation:)/g, "\n$1")
+    .replace(/\s+(Medicine:)/g, "\n$1")
+    .replace(/\s+(Manufacturer:)/g, "\n$1")
+    .replace(/\s+(Ingredients:)/g, "\n$1")
+    .replace(/\s+(Usage:)/g, "\n$1")
+    .replace(/\s+(Dosage:)/g, "\n$1")
+    .replace(/\s+(Warnings:)/g, "\n$1")
+    .replace(/\s+(Simple Explanation:)/g, "\n$1")
+    .replace(/\s+(Trust:)/g, "\n$1")
+    .replace(/\s+(Safety Note:)/g, "\n$1")
+    .trim();
+}
+
+function getModeTitle(mode: ScanMode): string {
+  if (mode === "image") return "Upload a medicine package";
+  if (mode === "prescription") return "Upload a prescription image";
+  if (mode === "report") return "Upload a medical report";
+  return "Enter barcode number";
+}
+
+function getModeDescription(mode: ScanMode): string {
+  if (mode === "image") {
+    return "Upload a clear medicine package for OCR and catalogue matching.";
+  }
+
+  if (mode === "prescription") {
+    return "Extract and translate visible text from prescription images.";
+  }
+
+  if (mode === "report") {
+    return "Extract and translate visible text from medical reports without automatic diagnosis.";
+  }
+
+  return "Prototype lookup only. It works when the barcode exists in the local catalogue.";
+}
+
+function buildReadableTrustNote(result: NormalizedScanResult): string {
+  if (isVerifiedCatalogResult(result)) {
+    return "Verified catalogue data was found. Use the catalogue fields first, then review OCR text as supporting evidence.";
+  }
+
+  if (result.sourceType === "prescription_upload") {
+    return "This is a prescription OCR and translation result. The translation may contain OCR mistakes, so verify important details with a doctor or pharmacist.";
+  }
+
+  if (result.sourceType === "report_upload") {
+    return "This is a medical report OCR and translation result. It is not a diagnosis and should be reviewed by a medical professional.";
+  }
+
+  if (result.sourceType === "barcode") {
+    return "This is a barcode lookup prototype. It only works when the barcode exists in the local medicine catalogue.";
+  }
+
+  return "No verified catalogue match was found. Review OCR text and translation carefully before relying on the result.";
+}
+
+function getResultTitle(result: NormalizedScanResult): string {
+  if (result.sourceType === "prescription_upload") return "Prescription OCR";
+  if (result.sourceType === "report_upload") return "Medical Report OCR";
+  return result.medicineName;
+}
+
+function getExplanationTitle(result: NormalizedScanResult): string {
+  return isDocumentResult(result) ? "Machine Translation" : "English Explanation";
+}
+
 export default function ScanPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const uploadMedicineScanMutation = useUploadMedicineScan();
+  const uploadPrescriptionScanMutation = useUploadPrescriptionScan();
+  const uploadReportScanMutation = useUploadReportScan();
   const scanBarcodeMutation = useScanBarcode();
 
-  const [mode, setMode] = useState<"image" | "barcode">("image");
+  const [mode, setMode] = useState<ScanMode>("image");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [barcode, setBarcode] = useState("");
   const [scanResult, setScanResult] = useState<NormalizedScanResult | null>(
@@ -119,7 +248,6 @@ export default function ScanPage() {
     if (!file) return;
 
     setSelectedFile(file);
-    setMode("image");
     setErrorMessage("");
     setScanResult(null);
   }
@@ -130,15 +258,26 @@ export default function ScanPage() {
     setIsAnalyzing(true);
 
     try {
-      if (mode === "image") {
+      if (mode !== "barcode") {
         if (!selectedFile) {
           throw new Error("Choose an image before starting analysis.");
         }
 
         const response =
-          await uploadMedicineScanMutation.mutateAsync(selectedFile);
+          mode === "image"
+            ? await uploadMedicineScanMutation.mutateAsync(selectedFile)
+            : mode === "prescription"
+              ? await uploadPrescriptionScanMutation.mutateAsync(selectedFile)
+              : await uploadReportScanMutation.mutateAsync(selectedFile);
 
-        setScanResult(mapScanResponse(response, previewUrl, "image_upload"));
+        const fallbackSource =
+          mode === "image"
+            ? "image_upload"
+            : mode === "prescription"
+              ? "prescription_upload"
+              : "report_upload";
+
+        setScanResult(mapScanResponse(response, previewUrl, fallbackSource));
         return;
       }
 
@@ -166,6 +305,7 @@ export default function ScanPage() {
   }
 
   const result = scanResult;
+
   const lowConfidence =
     result?.confidence !== null &&
     result?.confidence !== undefined &&
@@ -188,9 +328,9 @@ export default function ScanPage() {
           transition={{ delay: 0.08 }}
           className="text-on-surface-variant text-lg mt-3 max-w-3xl"
         >
-          Upload a medicine package or enter a barcode. The system extracts the
-          medicine name and dosage, checks the verified medicine dataset first,
-          then uses AI only when verified data is not enough.
+          Upload a medicine package, prescription, medical report, or enter a
+          barcode number. YAOBOX separates verified catalogue data, OCR evidence,
+          and translation output.
         </motion.p>
       </header>
 
@@ -214,7 +354,7 @@ export default function ScanPage() {
                     : "bg-white border border-outline-variant text-on-surface-variant"
                 }`}
               >
-                Image Upload
+                Medicine Package
               </button>
 
               <button
@@ -227,7 +367,33 @@ export default function ScanPage() {
                     : "bg-white border border-outline-variant text-on-surface-variant"
                 }`}
               >
-                Barcode Entry
+                Barcode Lookup Prototype
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMode("prescription")}
+                disabled={isAnalyzing}
+                className={`px-5 py-3 rounded-full text-sm font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
+                  mode === "prescription"
+                    ? "bg-yaobox-primary-container text-yaobox-on-primary-container"
+                    : "bg-white border border-outline-variant text-on-surface-variant"
+                }`}
+              >
+                Prescription OCR
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMode("report")}
+                disabled={isAnalyzing}
+                className={`px-5 py-3 rounded-full text-sm font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
+                  mode === "report"
+                    ? "bg-yaobox-primary-container text-yaobox-on-primary-container"
+                    : "bg-white border border-outline-variant text-on-surface-variant"
+                }`}
+              >
+                Medical Report OCR
               </button>
             </div>
 
@@ -239,32 +405,26 @@ export default function ScanPage() {
                 <div className="mx-auto w-20 h-20 rounded-full bg-yaobox-primary-container flex items-center justify-center text-yaobox-primary mb-2">
                   {isAnalyzing ? (
                     <Loader2 className="w-10 h-10 animate-spin" />
-                  ) : mode === "image" ? (
-                    <Upload className="w-10 h-10" />
-                  ) : (
+                  ) : mode === "barcode" ? (
                     <ScanLine className="w-10 h-10" />
+                  ) : (
+                    <Upload className="w-10 h-10" />
                   )}
                 </div>
 
                 <div className="space-y-2">
                   <h3 className="text-2xl font-semibold text-on-surface">
-                    {isAnalyzing
-                      ? "Analyzing input..."
-                      : mode === "image"
-                        ? "Drag and drop your photo"
-                        : "Enter medicine barcode"}
+                    {isAnalyzing ? "Analyzing input..." : getModeTitle(mode)}
                   </h3>
 
                   <p className="text-on-surface-variant">
                     {isAnalyzing
                       ? PROCESS_STEPS[stepIndex]
-                      : mode === "image"
-                        ? "Supported formats: JPG, PNG, HEIC. Clear photos of labels work best."
-                        : "Use the barcode from the package when image upload is not needed."}
+                      : getModeDescription(mode)}
                   </p>
                 </div>
 
-                {mode === "image" ? (
+                {mode !== "barcode" ? (
                   <>
                     {previewUrl ? (
                       <div className="flex flex-col items-center gap-3 pt-2">
@@ -338,13 +498,13 @@ export default function ScanPage() {
                       onClick={handleAnalyze}
                       disabled={
                         isAnalyzing ||
-                        (mode === "image"
-                          ? !selectedFile
-                          : barcode.trim().length === 0)
+                        (mode === "barcode"
+                          ? barcode.trim().length === 0
+                          : !selectedFile)
                       }
                       className="px-10 py-4 bg-on-surface text-white rounded-full font-bold hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Analyze Medicine
+                      Analyze
                     </button>
                   </div>
                 ) : null}
@@ -372,18 +532,18 @@ export default function ScanPage() {
               <TipCard
                 icon={<Maximize2 className="w-5 h-5" />}
                 title="Clear Context"
-                desc="Capture the whole package or report so dosage and warnings are not cut off."
+                desc="Capture the whole document so dosage, warnings, or report text are not cut off."
               />
             </div>
 
             <div className="flex flex-col items-center pt-1 gap-2">
               <p className="text-xs text-on-surface-variant font-medium opacity-70">
-                Typical analysis takes a few seconds depending on OCR and AI
-                response time.
+                Typical analysis takes a few seconds depending on OCR quality and
+                translation.
               </p>
               <p className="text-xs text-on-surface-variant opacity-70 text-center max-w-2xl">
-                Privacy note: uploads may contain health-related information.
-                Only send what you intend to analyze and save.
+                Safety note: this system helps users understand medicine text. It
+                does not diagnose, prescribe, or replace a doctor/pharmacist.
               </p>
             </div>
           </motion.div>
@@ -417,7 +577,7 @@ export default function ScanPage() {
                   <div className="flex flex-col items-center justify-center text-center p-6">
                     <Pill className="w-14 h-14 text-yaobox-secondary -rotate-45" />
                     <p className="mt-4 text-sm text-on-surface">
-                      Barcode-based result
+                      Barcode lookup prototype result
                     </p>
                   </div>
                 )}
@@ -426,9 +586,22 @@ export default function ScanPage() {
               <div className="flex-1 space-y-8 w-full">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div className="flex items-center gap-3 flex-wrap">
-                    <div className="px-4 py-1.5 bg-yaobox-primary-container text-yaobox-on-primary-container rounded-full text-xs font-bold flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4" />
-                      IDENTIFIED
+                    <div
+                      className={[
+                        "px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-2",
+                        isVerifiedCatalogResult(result)
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                          : "bg-yaobox-primary-container text-yaobox-on-primary-container",
+                      ].join(" ")}
+                    >
+                      {isVerifiedCatalogResult(result) ? (
+                        <ShieldCheck className="w-4 h-4" />
+                      ) : (
+                        <CheckCircle2 className="w-4 h-4" />
+                      )}
+                      {isVerifiedCatalogResult(result)
+                        ? "VERIFIED CATALOGUE MATCH"
+                        : "OCR / INPUT RESULT"}
                     </div>
 
                     <div className="px-4 py-1.5 bg-surface-container-low text-on-surface-variant rounded-full text-xs font-bold uppercase tracking-wide">
@@ -447,87 +620,132 @@ export default function ScanPage() {
                   ) : null}
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-3">
                   <h3 className="text-4xl font-bold text-on-surface">
-                    {result.medicineName}
+                    {getResultTitle(result)}
                   </h3>
-                  <p className="text-lg text-yaobox-primary font-medium">
-                    {result.medicineNameZh}
+
+                  {shouldShowChineseSubtitle(result) ? (
+                    <p className="text-lg text-yaobox-primary font-medium">
+                      {result.medicineNameZh}
+                    </p>
+                  ) : null}
+
+                  <p className="text-sm text-on-surface-variant leading-relaxed max-w-3xl">
+                    {buildResultSubtitle(result)}
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="p-5 bg-surface-container rounded-2xl">
-                    <p className="text-xs text-on-surface-variant font-bold uppercase tracking-wider mb-2">
-                      Dosage
-                    </p>
-                    <p className="font-medium text-on-surface">
-                      {result.dosage}
-                    </p>
-                  </div>
-
-                  <div className="p-5 bg-yaobox-tertiary-container/25 rounded-2xl">
-                    <p className="text-xs text-yaobox-tertiary font-bold uppercase tracking-wider mb-2">
-                      Warning
-                    </p>
-                    <p className="text-sm font-medium text-yaobox-tertiary">
-                      {result.warnings[0] ??
-                        "No warning text was returned by the backend."}
-                    </p>
-                  </div>
+                <div className="rounded-[24px] border border-emerald-100 bg-emerald-50 px-5 py-4 text-sm text-emerald-800 leading-relaxed">
+                  <div className="font-bold mb-1">Review note</div>
+                  {buildReadableTrustNote(result)}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {isDocumentResult(result) ? (
                   <div className="p-5 bg-surface-container-low rounded-2xl">
                     <p className="text-xs text-on-surface-variant font-bold uppercase tracking-wider mb-2">
-                      Usage
+                      {getExplanationTitle(result)}
                     </p>
-                    <p className="text-on-surface leading-relaxed">
-                      {result.usage}
-                    </p>
-                  </div>
-
-                  <div className="p-5 bg-surface-container-low rounded-2xl">
-                    <p className="text-xs text-on-surface-variant font-bold uppercase tracking-wider mb-2">
-                      Manufacturer
-                    </p>
-                    <p className="text-on-surface leading-relaxed">
-                      {result.manufacturer}
+                    <p className="text-on-surface leading-relaxed whitespace-pre-wrap">
+                      {formatExplanation(result.translatedSummary)}
                     </p>
                   </div>
-                </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="p-5 bg-surface-container rounded-2xl">
+                        <p className="text-xs text-on-surface-variant font-bold uppercase tracking-wider mb-2">
+                          Dosage
+                        </p>
+                        <p className="font-medium text-on-surface leading-relaxed">
+                          {result.dosage}
+                        </p>
+                      </div>
 
-                <div className="p-5 bg-surface-container-low rounded-2xl">
-                  <p className="text-xs text-on-surface-variant font-bold uppercase tracking-wider mb-2">
-                    English Explanation
-                  </p>
-                  <p className="text-on-surface leading-relaxed">
-                    {result.translatedSummary}
-                  </p>
-                </div>
+                      <div className="p-5 bg-yaobox-tertiary-container/25 rounded-2xl">
+                        <p className="text-xs text-yaobox-tertiary font-bold uppercase tracking-wider mb-2">
+                          Warning
+                        </p>
+                        <p className="text-sm font-medium text-yaobox-tertiary leading-relaxed">
+                          {result.warnings[0] ??
+                            "No warning text was returned by the backend."}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="p-5 bg-surface-container-low rounded-2xl">
+                        <p className="text-xs text-on-surface-variant font-bold uppercase tracking-wider mb-2">
+                          Ingredients
+                        </p>
+                        <p className="text-on-surface leading-relaxed">
+                          {result.ingredients}
+                        </p>
+                      </div>
+
+                      <div className="p-5 bg-surface-container-low rounded-2xl">
+                        <p className="text-xs text-on-surface-variant font-bold uppercase tracking-wider mb-2">
+                          Usage
+                        </p>
+                        <p className="text-on-surface leading-relaxed">
+                          {result.usage}
+                        </p>
+                      </div>
+
+                      <div className="p-5 bg-surface-container-low rounded-2xl">
+                        <p className="text-xs text-on-surface-variant font-bold uppercase tracking-wider mb-2">
+                          Manufacturer
+                        </p>
+                        <p className="text-on-surface leading-relaxed">
+                          {result.manufacturer}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-5 bg-surface-container-low rounded-2xl">
+                      <p className="text-xs text-on-surface-variant font-bold uppercase tracking-wider mb-2">
+                        {getExplanationTitle(result)}
+                      </p>
+                      <p className="text-on-surface leading-relaxed whitespace-pre-wrap">
+                        {formatExplanation(result.translatedSummary)}
+                      </p>
+                    </div>
+                  </>
+                )}
 
                 <details className="p-5 bg-surface-container-low rounded-2xl">
                   <summary className="cursor-pointer text-sm font-bold text-on-surface">
-                    Show original extracted Chinese text
+                    Show full OCR text
                   </summary>
                   <p className="mt-4 text-sm leading-relaxed text-on-surface-variant whitespace-pre-wrap">
                     {result.extractedText}
                   </p>
                 </details>
 
+                <details className="p-5 bg-surface-container-low rounded-2xl">
+                  <summary className="cursor-pointer text-sm font-bold text-on-surface">
+                    Show technical trust details
+                  </summary>
+                  <p className="mt-4 text-sm leading-relaxed text-on-surface-variant whitespace-pre-wrap">
+                    {result.trustNotes}
+                  </p>
+                </details>
+
                 <div className="flex flex-wrap gap-4 pt-2">
-                  <Link
-                to="/reminders/create"
-               state={{
-                    medicineId: result.medicineId,
-                    medicineName: result.medicineName,
-                    dosageNote: result.dosage,
-                    sourceScanId: result.scanId,
-                  }}
-  className="px-8 py-4 bg-on-surface text-white rounded-full font-bold hover:opacity-90 active:scale-95 transition-all"
->
-  Create Reminder
-</Link>
+                  {!isDocumentResult(result) ? (
+                    <Link
+                      to="/reminders/create"
+                      state={{
+                        medicineId: result.medicineId,
+                        medicineName: result.medicineName,
+                        dosageNote: result.dosage,
+                        sourceScanId: result.scanId,
+                      }}
+                      className="px-8 py-4 bg-on-surface text-white rounded-full font-bold hover:opacity-90 active:scale-95 transition-all"
+                    >
+                      Create Reminder
+                    </Link>
+                  ) : null}
 
                   <Link
                     to="/history"
@@ -549,7 +767,7 @@ export default function ScanPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-on-surface-variant">
                   <div className="p-4 rounded-2xl border border-outline-variant/30">
                     <span className="font-bold text-on-surface">Barcode:</span>{" "}
-                    {result.barcode}
+                    {result.barcode ?? "Not available"}
                   </div>
 
                   <div className="p-4 rounded-2xl border border-outline-variant/30">

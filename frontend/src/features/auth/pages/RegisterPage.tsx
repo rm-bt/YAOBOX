@@ -245,47 +245,14 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={registerMutation.isPending || !formData.terms}
-              className="w-full bg-[#635d5a] text-white font-bold rounded-full py-5 flex items-center justify-center gap-2 hover:bg-stone-800 transition-all shadow-xl shadow-stone-100 disabled:opacity-70 disabled:cursor-not-allowed"
+              className="w-full bg-[#4f5f43] text-white font-bold rounded-full py-5 flex items-center justify-center gap-2 hover:bg-[#3f4d35] transition-all shadow-[0_8px_18px_rgba(79,95,67,0.16)] disabled:bg-stone-300 disabled:text-stone-500 disabled:shadow-none disabled:cursor-not-allowed active:scale-[0.98]"
             >
-              {registerMutation.isPending
-                ? "Creating Account..."
-                : "Create Account"}
+              {registerMutation.isPending ? "Creating Account..." : "Create Account"}
               <ArrowRight size={20} />
             </button>
           </form>
 
-          <div className="relative my-8">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-stone-100" />
-            </div>
-            <div className="relative flex justify-center text-[11px] font-bold">
-              <span className="bg-white px-6 text-stone-400 uppercase tracking-widest">
-                External sign-in not enabled in this build
-              </span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <button
-              type="button"
-              disabled
-              className="flex items-center justify-center gap-3 w-full bg-white border border-stone-200 text-stone-400 text-sm font-bold rounded-full py-3.5 opacity-70 cursor-not-allowed"
-            >
-              <span className="w-5 h-5 rounded-full bg-stone-200 inline-block" />
-              Google
-            </button>
-
-            <button
-              type="button"
-              disabled
-              className="flex items-center justify-center gap-3 w-full bg-white border border-stone-200 text-stone-400 text-sm font-bold rounded-full py-3.5 opacity-70 cursor-not-allowed"
-            >
-              <span className="w-5 h-5 rounded-full bg-stone-200 inline-block" />
-              Apple
-            </button>
-          </div>
-
-          <p className="mt-10 text-center text-sm text-stone-500 font-medium">
+          <p className="mt-8 text-center text-sm text-stone-500 font-medium">
             Already have an account?{" "}
             <Link
               to="/login"
