@@ -68,6 +68,9 @@ function sourceLabel(sourceType: string): string {
 
     case "prescription_upload":
       return "Prescription Upload";
+      case "report_upload":
+  return "Medical Report Upload";
+      
 
     default:
       return sourceType;

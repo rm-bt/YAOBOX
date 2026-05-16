@@ -80,6 +80,7 @@ def build_history_response(scan: ScanRecord) -> dict:
         "ai_confidence": scan.ai_confidence,
         "trust_notes": scan.trust_notes,
         "created_at": scan.created_at,
+        "ingredients": scan.ingredients,
     }
 
 

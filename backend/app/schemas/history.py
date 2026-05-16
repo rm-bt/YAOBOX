@@ -29,6 +29,7 @@ class HistoryResponse(BaseModel):
     ocr_confidence: float | None = None
     ai_confidence: str | None = None
     trust_notes: str | None = None
+    ingredients: str | None = None
 
     created_at: datetime
 
