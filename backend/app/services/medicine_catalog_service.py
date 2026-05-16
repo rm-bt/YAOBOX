@@ -365,7 +365,8 @@ def apply_medicine_fields(medicine: Medicine, item: dict) -> Medicine:
     medicine.warnings_en = normalize_text(item.get("warnings_en"))
     medicine.aliases = build_alias_text(item)
     medicine.is_verified = bool(item.get("is_verified", True))
-
+    medicine.ingredients = normalize_text(item.get("ingredients"))
+    medicine.ingredients_en = normalize_text(item.get("ingredients_en"))
     return medicine
 
 

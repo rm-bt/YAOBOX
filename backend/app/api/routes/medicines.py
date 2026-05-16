@@ -39,6 +39,8 @@ def create_medicine(
         warnings_en=normalize_text(data.warnings_en),
         aliases=normalize_text(data.aliases),
         is_verified=data.is_verified,
+        ingredients=normalize_text(data.ingredients),
+        ingredients_en=normalize_text(data.ingredients_en),
     )
 
     db.add(medicine)

@@ -71,6 +71,7 @@ def explain_medicine_info(
     manufacturer: str | None,
     usage: str | None,
     dosage: str | None,
+     ingredients: str | None = None,
     raw_text: str | None = None,
 ) -> str:
     prompt = f"""
@@ -107,6 +108,7 @@ Manufacturer: {manufacturer or ""}
 Usage: {usage or ""}
 Dosage: {dosage or ""}
 Raw OCR text: {raw_text or ""}
+Ingredients: {ingredients or ""}
 """.strip()
 
     try:

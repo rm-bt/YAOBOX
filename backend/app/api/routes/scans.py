@@ -11,9 +11,9 @@ from app.models.scan import ScanRecord
 from app.models.user import User
 from app.schemas.scan import ScanBarcodeRequest, ScanCreate, ScanResponse
 from app.services.ai_service import answer_scan_question, explain_medicine_info
-from app.services.openai_ocr_service import (
-    extract_text_openai_vision,
-    is_openai_ocr_enabled,
+from app.services.medicine_catalog_service import (
+    CatalogMatchResult,
+    match_catalog_medicine,
 )
 from app.services.ocr_service import (
     clean_text,
@@ -24,14 +24,14 @@ from app.services.ocr_service import (
     extract_text_with_confidence,
     extract_usage,
 )
+from app.services.openai_ocr_service import (
+    extract_text_openai_vision,
+    is_openai_ocr_enabled,
+)
 from app.services.upload_validation import (
     build_upload_path,
     validate_image_upload_metadata,
     validate_upload_bytes,
-)
-from app.services.medicine_catalog_service import (
-    CatalogMatchResult,
-    match_catalog_medicine,
 )
 
 router = APIRouter()
@@ -57,6 +57,7 @@ def safe_explanation(
         return explain_medicine_info(
             medicine_name=medicine_name,
             manufacturer=manufacturer,
+            ingredients=ingredients,
             usage=usage,
             dosage=dosage,
             raw_text=raw_text,
@@ -69,7 +70,7 @@ def safe_explanation(
             f"Usage: {usage or 'Not available'}\n"
             f"Dosage: {dosage or 'Not available'}\n"
             "Warnings: Not available\n"
-            "Simple Explanation: AI service is temporarily unavailable. "
+            "Simple Explanation: Explanation is temporarily unavailable. "
             "This is a limited fallback summary.\n"
             "Safety Note: This information supports medicine understanding only. "
             "Confirm important medicine decisions with a doctor or pharmacist."
@@ -81,7 +82,7 @@ def get_ai_status(value: str | None) -> str:
         return "skipped"
 
     lowered = value.lower()
-    if "ai service is temporarily unavailable" in lowered:
+    if "temporarily unavailable" in lowered:
         return "fallback"
 
     return "succeeded"
@@ -107,14 +108,14 @@ def build_trust_notes(
         f"Source type: {source_type}.",
         f"Medicine match: {match_status}.",
         f"OCR status: {ocr_status}.",
-        f"AI explanation status: {ai_status}.",
+        f"Translation/explanation status: {ai_status}.",
     ]
 
     if catalog_reason:
-        notes.append(f"Catalog match reason: {catalog_reason}.")
+        notes.append(f"Catalogue match reason: {catalog_reason}.")
 
     if catalog_score is not None:
-        notes.append(f"Catalog match score: {catalog_score}.")
+        notes.append(f"Catalogue match score: {catalog_score}.")
 
     if ocr_error:
         notes.append(
@@ -123,27 +124,33 @@ def build_trust_notes(
 
     if match_status == "verified":
         notes.append(
-            "Verified catalog data should be trusted more than OCR or AI-generated text."
+            "Verified catalogue data should be trusted more than OCR or generated text."
         )
     elif match_status == "catalog_unverified":
-        notes.append("Catalog data was found but is not marked verified.")
+        notes.append("Catalogue data was found but is not marked verified.")
     else:
         notes.append(
-            "No verified medicine catalog match was found; review OCR and AI text carefully."
+            "No verified medicine catalogue match was found; review OCR and translation carefully."
         )
 
     return " ".join(notes)
+
+
+def append_ocr_method_note(trust_notes: str, fallback_used: bool) -> str:
+    if fallback_used:
+        return (
+            trust_notes
+            + " Enhanced OCR fallback was used because the initial text extraction was unclear or incomplete."
+        )
+
+    return trust_notes + " Standard OCR extraction was used."
 
 
 def display_medicine_name(medicine: Medicine) -> str:
     if medicine.canonical_name_zh and medicine.canonical_name_en:
         return f"{medicine.canonical_name_zh} / {medicine.canonical_name_en}"
 
-    return (
-        medicine.canonical_name_zh
-        or medicine.canonical_name_en
-        or "Unknown medicine"
-    )
+    return medicine.canonical_name_zh or medicine.canonical_name_en or "Unknown medicine"
 
 
 def build_catalog_explanation(
@@ -401,7 +408,6 @@ def upload_scan_image(
         )
 
         catalog_match = catalog_result.medicine
-        ocr_engine = "tesseract"
         fallback_used = False
         fallback_error = None
 
@@ -452,8 +458,6 @@ def upload_scan_image(
 
                     catalog_result = openai_catalog_result
                     catalog_match = openai_catalog_result.medicine
-
-                    ocr_engine = "openai_vision"
                     fallback_used = True
             else:
                 fallback_error = openai_result.error
@@ -512,14 +516,7 @@ def upload_scan_image(
             catalog_reason=catalog_result.reason,
             catalog_score=catalog_result.score,
         )
-
-        if fallback_used:
-            trust_notes += (
-                " Enhanced OCR fallback was used because the initial text extraction "
-                "was unclear or incomplete."
-            )
-        else:
-            trust_notes += " Standard OCR extraction was used."
+        trust_notes = append_ocr_method_note(trust_notes, fallback_used)
 
         new_scan = ScanRecord(
             user_id=current_user.id,
@@ -670,6 +667,97 @@ def scan_by_barcode(
         raise HTTPException(status_code=500, detail=f"Failed to process barcode: {str(exc)}")
 
 
+def process_document_upload(
+    *,
+    file: UploadFile,
+    db: Session,
+    current_user: User,
+    source_type: str,
+    display_name: str,
+    error_label: str,
+) -> ScanRecord:
+    save_path = save_upload_file(file)
+
+    ocr_result = extract_text_with_confidence(save_path)
+    raw_text = ocr_result.raw_text
+    cleaned_text = ocr_result.cleaned_text or clean_text(raw_text)
+
+    fallback_used = False
+    fallback_error = None
+
+    if should_use_openai_ocr(
+        cleaned_text=cleaned_text,
+        confidence=ocr_result.confidence,
+        catalog_match=None,
+    ):
+        openai_result = extract_text_openai_vision(save_path)
+
+        if openai_result.status == "succeeded" and openai_result.cleaned_text:
+            if should_accept_openai_ocr(
+                local_cleaned_text=cleaned_text,
+                local_confidence=ocr_result.confidence,
+                openai_cleaned_text=openai_result.cleaned_text,
+                openai_confidence=openai_result.confidence,
+                local_catalog_match=None,
+                openai_catalog_match=None,
+            ):
+                ocr_result = openai_result
+                raw_text = openai_result.raw_text
+                cleaned_text = openai_result.cleaned_text
+                fallback_used = True
+        else:
+            fallback_error = openai_result.error
+
+    translated_result = safe_explanation(
+        medicine_name=None,
+        manufacturer=None,
+        ingredients=None,
+        usage=None,
+        dosage=None,
+        raw_text=cleaned_text,
+    )
+
+    match_status = "ocr_extracted" if cleaned_text else "unknown"
+    ai_status = get_ai_status(translated_result)
+
+    trust_notes = build_trust_notes(
+        source_type=source_type,
+        match_status=match_status,
+        ocr_status=ocr_result.status,
+        ai_status=ai_status,
+        ocr_error=ocr_result.error or fallback_error,
+    )
+    trust_notes = append_ocr_method_note(trust_notes, fallback_used)
+
+    new_record = ScanRecord(
+        user_id=current_user.id,
+        image_path=save_path,
+        barcode=None,
+        medicine_id=None,
+        medicine_name=display_name,
+        raw_ocr_text=cleaned_text,
+        translated_text=translated_result,
+        manufacturer=None,
+        ingredients=None,
+        usage=None,
+        dosage=None,
+        warnings=extract_warning_text(cleaned_text),
+        source_type=source_type,
+        match_status=match_status,
+        ocr_status=ocr_result.status,
+        ai_status=ai_status,
+        ocr_confidence=ocr_result.confidence,
+        ai_confidence="medium" if ai_status == "succeeded" else None,
+        trust_notes=trust_notes,
+    )
+
+    db.add(new_record)
+    db.commit()
+    db.refresh(new_record)
+
+    return new_record
+
+
 @router.post("/upload-prescription", response_model=ScanResponse)
 def upload_prescription(
     file: UploadFile = File(...),
@@ -677,104 +765,24 @@ def upload_prescription(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        save_path = save_upload_file(file)
-
-        ocr_result = extract_text_with_confidence(save_path)
-        raw_text = ocr_result.raw_text
-        cleaned_text = ocr_result.cleaned_text or clean_text(raw_text)
-
-        ocr_engine = "tesseract"
-        fallback_used = False
-        fallback_error = None
-
-        if should_use_openai_ocr(
-            cleaned_text=cleaned_text,
-            confidence=ocr_result.confidence,
-            catalog_match=None,
-        ):
-            openai_result = extract_text_openai_vision(save_path)
-
-            if openai_result.status == "succeeded" and openai_result.cleaned_text:
-                if should_accept_openai_ocr(
-                    local_cleaned_text=cleaned_text,
-                    local_confidence=ocr_result.confidence,
-                    openai_cleaned_text=openai_result.cleaned_text,
-                    openai_confidence=openai_result.confidence,
-                    local_catalog_match=None,
-                    openai_catalog_match=None,
-                ):
-                    ocr_result = openai_result
-                    raw_text = openai_result.raw_text
-                    cleaned_text = openai_result.cleaned_text
-                    ocr_engine = "openai_vision"
-                    fallback_used = True
-            else:
-                fallback_error = openai_result.error
-
-        ingredients = None
-        translated_result = safe_explanation(
-            medicine_name=None,
-            manufacturer=None,
-            ingredients=ingredients,
-            usage=None,
-            dosage=None,
-            raw_text=cleaned_text,
+        return process_document_upload(
+            file=file,
+            db=db,
+            current_user=current_user,
+            source_type="prescription_upload",
+            display_name="Prescription OCR",
+            error_label="prescription image",
         )
-
-        source_type = "prescription_upload"
-        match_status = "ocr_extracted" if cleaned_text else "unknown"
-        ai_status = get_ai_status(translated_result)
-
-        trust_notes = build_trust_notes(
-            source_type=source_type,
-            match_status=match_status,
-            ocr_status=ocr_result.status,
-            ai_status=ai_status,
-            ocr_error=ocr_result.error or fallback_error,
-        )
-
-        trust_notes += f" OCR engine used: {ocr_engine}."
-
-        if fallback_used:
-            trust_notes += (
-                " OpenAI Vision OCR fallback was used because local OCR was weak."
-            )
-
-        new_record = ScanRecord(
-            user_id=current_user.id,
-            image_path=save_path,
-            barcode=None,
-            medicine_id=None,
-            medicine_name="Prescription OCR",
-            raw_ocr_text=cleaned_text,
-            translated_text=translated_result,
-            manufacturer=None,
-            ingredients=ingredients,
-            usage=None,
-            dosage=None,
-            warnings=extract_warning_text(cleaned_text),
-            source_type=source_type,
-            match_status=match_status,
-            ocr_status=ocr_result.status,
-            ai_status=ai_status,
-            ocr_confidence=ocr_result.confidence,
-            ai_confidence="medium" if ai_status == "succeeded" else None,
-            trust_notes=trust_notes,
-        )
-
-        db.add(new_record)
-        db.commit()
-        db.refresh(new_record)
-
-        return new_record
 
     except HTTPException:
         raise
     except Exception as exc:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to process prescription image: {str(exc)}")
-    
-    
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to process prescription image: {str(exc)}",
+        )
+
 
 @router.post("/upload-report", response_model=ScanResponse)
 def upload_report(
@@ -783,62 +791,14 @@ def upload_report(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        save_path = save_upload_file(file)
-
-        ocr_result = extract_text_with_confidence(save_path)
-        raw_text = ocr_result.raw_text
-        cleaned_text = ocr_result.cleaned_text or clean_text(raw_text)
-
-        translated_result = safe_explanation(
-            medicine_name=None,
-            manufacturer=None,
-            ingredients=None,
-            usage=None,
-            dosage=None,
-            raw_text=cleaned_text,
+        return process_document_upload(
+            file=file,
+            db=db,
+            current_user=current_user,
+            source_type="report_upload",
+            display_name="Medical Report OCR",
+            error_label="report image",
         )
-
-        source_type = "report_upload"
-        match_status = "ocr_extracted" if cleaned_text else "unknown"
-        ai_status = get_ai_status(translated_result)
-
-        trust_notes = build_trust_notes(
-            source_type=source_type,
-            match_status=match_status,
-            ocr_status=ocr_result.status,
-            ai_status=ai_status,
-            ocr_error=ocr_result.error,
-        )
-
-        trust_notes += " OCR engine used: tesseract."
-
-        new_record = ScanRecord(
-            user_id=current_user.id,
-            image_path=save_path,
-            barcode=None,
-            medicine_id=None,
-            medicine_name="Medical Report OCR",
-            raw_ocr_text=cleaned_text,
-            translated_text=translated_result,
-            manufacturer=None,
-            ingredients=None,
-            usage=None,
-            dosage=None,
-            warnings=extract_warning_text(cleaned_text),
-            source_type=source_type,
-            match_status=match_status,
-            ocr_status=ocr_result.status,
-            ai_status=ai_status,
-            ocr_confidence=ocr_result.confidence,
-            ai_confidence="medium" if ai_status == "succeeded" else None,
-            trust_notes=trust_notes,
-        )
-
-        db.add(new_record)
-        db.commit()
-        db.refresh(new_record)
-
-        return new_record
 
     except HTTPException:
         raise
@@ -848,6 +808,8 @@ def upload_report(
             status_code=500,
             detail=f"Failed to process report image: {str(exc)}",
         )
+
+
 class ScanQuestionRequest(BaseModel):
     scan_id: int
     question: str
@@ -887,7 +849,7 @@ def ask_about_scan(
             f"Ingredients: {scan.ingredients or 'Not available'}\n"
             f"Usage: {scan.usage or 'Not available'}\n"
             f"Dosage: {scan.dosage or 'Not available'}\n"
-            "Note: AI service is temporarily unavailable, so this is a limited fallback answer. "
+            "Note: Answering is temporarily unavailable, so this is a limited fallback answer. "
             "Confirm important medicine decisions with a doctor or pharmacist."
         )
 
