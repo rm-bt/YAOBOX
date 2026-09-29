@@ -213,7 +213,7 @@ function Steps() {
   const steps = [
     {
       icon: <Camera className="h-8 w-8" />,
-      title: "1. Scan or upload",
+      title: "1. upload image",
       desc: "Upload a medicine package, prescription, or report image for OCR processing.",
     },
     {

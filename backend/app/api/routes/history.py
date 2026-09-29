@@ -103,7 +103,7 @@ def get_user_scan_or_404(
 
     return scan
 
-
+#  list user scan history
 @router.get("/", response_model=list[HistoryResponse])
 def get_history(
     db: Session = Depends(get_db),
@@ -118,7 +118,7 @@ def get_history(
 
     return [build_history_response(scan) for scan in scans]
 
-
+#  get scan history detail
 @router.get("/{scan_id}", response_model=HistoryResponse)
 def get_history_item(
     scan_id: int,

@@ -215,7 +215,7 @@ def score_alias_against_text(alias: str, query_text: str) -> int:
 
     return 0
 
-
+#  medicine match scoring
 def score_medicine(
     medicine: Medicine,
     barcode: str | None,
@@ -281,7 +281,7 @@ def score_medicine(
         reason=reason,
     )
 
-
+# best catalogue match selection
 def match_catalog_medicine(
     db: Session,
     barcode: str | None = None,

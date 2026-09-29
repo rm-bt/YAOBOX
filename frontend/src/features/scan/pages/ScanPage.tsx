@@ -11,7 +11,6 @@ import { Link } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import {
   AlertTriangle,
-  Camera,
   CheckCircle2,
   ChevronRight,
   FolderOpen,
@@ -191,7 +190,7 @@ function getExplanationTitle(result: NormalizedScanResult): string {
 
 export default function ScanPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
+
 
   const uploadMedicineScanMutation = useUploadMedicineScan();
   const uploadPrescriptionScanMutation = useUploadPrescriptionScan();
@@ -449,14 +448,7 @@ export default function ScanPage() {
                           onChange={onFileChange}
                         />
 
-                        <input
-                          ref={cameraInputRef}
-                          type="file"
-                          className="hidden"
-                          accept="image/*"
-                          capture="environment"
-                          onChange={onFileChange}
-                        />
+    
 
                         <button
                           type="button"
@@ -467,14 +459,7 @@ export default function ScanPage() {
                           Browse Files
                         </button>
 
-                        <button
-                          type="button"
-                          onClick={() => cameraInputRef.current?.click()}
-                          className="flex items-center justify-center gap-2 px-8 py-3.5 border-2 border-yaobox-secondary text-yaobox-secondary rounded-full font-medium hover:bg-yaobox-primary-container/30 transition-all active:scale-95"
-                        >
-                          <Camera className="w-5 h-5" />
-                          Use Camera
-                        </button>
+  
                       </div>
                     ) : null}
                   </>
@@ -532,7 +517,7 @@ export default function ScanPage() {
               <TipCard
                 icon={<Maximize2 className="w-5 h-5" />}
                 title="Clear Context"
-                desc="Capture the whole document so dosage, warnings, or report text are not cut off."
+                desc="Upload the whole document so dosage, warnings, or report text are not cut off."
               />
             </div>
 

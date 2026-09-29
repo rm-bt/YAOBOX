@@ -60,3 +60,12 @@ pnpm-debug.log*
 # Keep uploads directory present without tracking uploaded files
 !backend/uploads/
 !backend/uploads/.gitkeep
+.venv/
+venv/
+node_modules/
+__pycache__/
+.env
+.env.*
+!.env.example
+dist/
+build/

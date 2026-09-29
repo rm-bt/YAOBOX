@@ -67,7 +67,7 @@ def get_user_reminder_or_404(
 
     return reminder
 
-
+# create reminder
 @router.post("/", response_model=ReminderResponse)
 def create_reminder(
     data: ReminderCreate,
@@ -115,7 +115,7 @@ def create_reminder(
 
     return reminder
 
-
+# list user reminders
 @router.get("/", response_model=list[ReminderResponse])
 def get_my_reminders(
     db: Session = Depends(get_db),
@@ -129,7 +129,7 @@ def get_my_reminders(
     )
     return reminders
 
-
+# update reminder
 @router.put("/{reminder_id}", response_model=ReminderResponse)
 def update_reminder(
     reminder_id: int,
@@ -188,7 +188,7 @@ def update_reminder(
 
     return reminder
 
-
+# JOB: delete reminder
 @router.delete("/{reminder_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_reminder(
     reminder_id: int,

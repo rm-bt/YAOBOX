@@ -69,7 +69,7 @@ def crop_center_region(image):
 
     return image[y1:y2, x1:x2]
 
-
+# image preprocessing
 def preprocess_image(image_path: str) -> Image.Image:
     image = cv2.imread(image_path)
     if image is None:
@@ -130,7 +130,7 @@ def extract_text(image_path: str) -> str:
 
     return text.strip()
 
-
+# local OCR extraction
 def extract_text_with_confidence(image_path: str) -> OCRResult:
     try:
         processed_image = preprocess_image(image_path)
@@ -180,7 +180,7 @@ def extract_text_with_confidence(image_path: str) -> OCRResult:
             error=str(exc),
         )
 
-
+# OCR text cleaning
 def clean_text(text: str) -> str:
     if not text:
         return ""
@@ -212,7 +212,7 @@ def clean_text(text: str) -> str:
 
     return text
 
-
+# medicine name extraction
 def extract_medicine_name(text: str) -> str | None:
     if not text:
         return None
@@ -304,7 +304,7 @@ def extract_usage(text: str) -> str | None:
 
     return None
 
-
+# dosage text extraction
 def extract_dosage(text: str) -> str | None:
     if not text:
         return None

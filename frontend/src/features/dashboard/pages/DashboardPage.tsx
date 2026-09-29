@@ -342,7 +342,7 @@ export default function DashboardPage() {
             to="/scan"
             icon={<Camera size={24} />}
             title="Scan Medicine"
-            description="Upload or capture a medicine package image for OCR and review."
+            description="Upload a medicine package image for OCR and review."
           />
 
           <ActionCard

@@ -94,7 +94,7 @@ def get_match_status(medicine: Medicine | None, fallback: str = "unknown") -> st
 
     return "verified" if medicine.is_verified else "catalog_unverified"
 
-
+#trust notes generation
 def build_trust_notes(
     source_type: str,
     match_status: str,
@@ -238,7 +238,7 @@ def find_catalog_match(
         raw_text=raw_text,
     )
 
-
+# OpenAI OCR fallback decision
 def should_use_openai_ocr(
     cleaned_text: str | None,
     confidence: float | None,
@@ -264,7 +264,7 @@ def should_use_openai_ocr(
 
     return confidence < min_confidence
 
-
+# OpenAI OCR fallback acceptance
 def should_accept_openai_ocr(
     local_cleaned_text: str | None,
     local_confidence: float | None,
@@ -377,7 +377,7 @@ def get_my_scans(
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to fetch scans: {str(exc)}")
 
-
+#  main medicine image scan
 @router.post("/upload", response_model=ScanResponse)
 def upload_scan_image(
     file: UploadFile = File(...),
@@ -552,7 +552,7 @@ def upload_scan_image(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to process uploaded image: {str(exc)}")
 
-
+#  barcode lookup prototype
 @router.post("/barcode", response_model=ScanResponse)
 def scan_by_barcode(
     data: ScanBarcodeRequest,
@@ -666,7 +666,7 @@ def scan_by_barcode(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to process barcode: {str(exc)}")
 
-
+# shared prescription/report OCR workflow
 def process_document_upload(
     *,
     file: UploadFile,
@@ -757,7 +757,7 @@ def process_document_upload(
 
     return new_record
 
-
+#  prescription OCR upload
 @router.post("/upload-prescription", response_model=ScanResponse)
 def upload_prescription(
     file: UploadFile = File(...),
@@ -783,7 +783,7 @@ def upload_prescription(
             detail=f"Failed to process prescription image: {str(exc)}",
         )
 
-
+#  medical report OCR upload
 @router.post("/upload-report", response_model=ScanResponse)
 def upload_report(
     file: UploadFile = File(...),

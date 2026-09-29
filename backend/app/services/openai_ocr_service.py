@@ -22,7 +22,7 @@ class OpenAIOCRResult:
     engine: str = "openai_vision"
     error: str | None = None
 
-
+# OpenAI OCR enabled check
 def is_openai_ocr_enabled() -> bool:
     return os.getenv("OPENAI_OCR_ENABLED", "false").strip().lower() == "true"
 
@@ -56,7 +56,7 @@ def _extract_json_object(text: str) -> dict:
 
     return json.loads(cleaned[start : end + 1])
 
-
+# OpenAI Vision OCR fallback
 def extract_text_openai_vision(image_path: str) -> OpenAIOCRResult:
     if not is_openai_ocr_enabled():
         return OpenAIOCRResult(

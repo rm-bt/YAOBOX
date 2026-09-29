@@ -65,7 +65,7 @@ def _build_translation_fallback(raw_text: str | None) -> str:
         f"Safety Note: {GENERAL_SAFETY_NOTE}"
     )
 
-
+#  Gemini AI explanation
 def explain_medicine_info(
     medicine_name: str | None,
     manufacturer: str | None,
@@ -138,7 +138,7 @@ Ingredients: {ingredients or ""}
 
     return _build_translation_fallback(raw_text)
 
-
+# scan question answering
 def answer_scan_question(
     medicine_name: str | None,
     manufacturer: str | None,
